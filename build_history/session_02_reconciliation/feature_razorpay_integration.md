@@ -38,7 +38,8 @@ status: "Built"
   ```
 
 ## 5. Testing & Verification
-* **Automated tests:** none (Tests pending for Session 2 Checkpoint)
+* **Automated tests:**
+  * `apps/web/src/__tests__/reconciliation.test.ts` — tests UPI webhook idempotency: fires the same `ref_number` twice and asserts exactly one `TRANSACTION` row exists (second call returns the existing record without a new insert). Also tests that `channel: cheque` initialises to `cheque_pending` status, not `posted`.
 * **Manually verified:** `handleRazorpayWebhook` securely verifies HMAC signatures and correctly handles idempotency via `ref_number`.
 
 ## 6. Dependencies & Deferred Work

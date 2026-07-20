@@ -1,5 +1,10 @@
-# LOG_TEMPLATE
-Use this exact structure for every feature log in `build_history/`. Copy it, replace every `{{PLACEHOLDER}}`, delete nothing else.
+---
+feature: "Offline Sync & Conflict Resolution"
+session: "Session 3"
+status: "Built"
+---
+
+# Feature: Offline Sync & Conflict Resolution
 
 ## 1. Overview
 * **Name:** Offline Sync & Conflict Resolution

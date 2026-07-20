@@ -1,5 +1,10 @@
-# LOG_TEMPLATE
-Use this exact structure for every feature log in `build_history/`. Copy it, replace every `{{PLACEHOLDER}}`, delete nothing else.
+---
+feature: "Student Profile & Lifecycle Management"
+session: "Session 3"
+status: "Built"
+---
+
+# Feature: Student Profile & Lifecycle Management
 
 ## 1. Overview
 * **Name:** Student Profile & Lifecycle Management

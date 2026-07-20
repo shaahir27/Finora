@@ -1,5 +1,10 @@
-# LOG_TEMPLATE
-Use this exact structure for every feature log in `build_history/`. Copy it, replace every `{{PLACEHOLDER}}`, delete nothing else.
+---
+feature: "PWA & Push Notifications"
+session: "Session 3"
+status: "Built"
+---
+
+# Feature: PWA & Push Notifications
 
 ## 1. Overview
 * **Name:** PWA & Push Notifications

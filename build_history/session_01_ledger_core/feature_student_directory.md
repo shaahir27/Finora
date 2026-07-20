@@ -61,7 +61,8 @@ status: "Built"
   ```
 
 ## 5. Testing & Verification
-* **Automated tests:** `apps/web/src/__tests__/studentDirectory.test.ts`
+* **Automated tests:**
+  * `apps/web/src/__tests__/studentDirectory.test.ts` — tests `bulkImportStudents` partial-batch failure (valid rows succeed, invalid rows reported individually), idempotent re-run (duplicate admission numbers are skipped, not duplicated), `updateStudentStatus` rejection when `balanceDisposition` is missing on a nonzero-balance student, `write_off` disposition creates a real `WAIVER` row and `AUDIT_LOG` entry, and zero-balance students can be withdrawn without a disposition.
 * **Manually verified:** Evaluated edge cases in anomaly detection.
 
 ## 6. Dependencies & Deferred Work

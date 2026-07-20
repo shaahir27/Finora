@@ -37,19 +37,20 @@ status: "Built"
   ): Promise<Transaction>
   // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
-  * `applyWaiver` (`apps/web/src/app/actions/ledger.ts`): Applies a financial waiver to a specific fee assignment.
+  * `applyWaiver` (`apps/web/src/app/actions/ledger.ts`): Applies a financial waiver to a specific fee assignment with mandatory audit logging.
   ```typescript
   export async function applyWaiver(
-    adminId: string, schoolId: string,
-    data: { feeAssignmentId: string; amount: number; reason: string; }
+    adminId: string, schoolId: string, feeAssignmentId: string,
+    data: { amount: number; reason: string; }
   )
-  // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
+  // Note: feeAssignmentId is a positional argument, NOT nested inside data.
+  // Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
-  * `applyPenalty` (`apps/web/src/app/actions/ledger.ts`): Applies a financial penalty (e.g. late fee).
+  * `applyPenalty` (`apps/web/src/app/actions/ledger.ts`): Applies a financial penalty (e.g. late fee) with mandatory audit logging.
   ```typescript
   export async function applyPenalty(
-    adminId: string, schoolId: string,
-    data: { feeAssignmentId: string; amount: number; reason: string; }
+    adminId: string, transactionId: string,
+    data: { amount: number; reason: string; }
   )
   // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
@@ -67,7 +68,9 @@ status: "Built"
   ```
 
 ## 5. Testing & Verification
-* **Automated tests:** none (Tests pending for Session 1 Checkpoint)
+* **Automated tests:**
+  * `apps/web/src/__tests__/waiverPenaltyAudit.test.ts` — directly tests `applyWaiver` and `applyPenalty`: verifies `AUDIT_LOG` rows are produced on every call, empty/null reasons are rejected at the application layer, and empty `adminId` is rejected.
+  * `apps/web/src/__tests__/reconciliation.test.ts` — tests `recordPayment`, `markChequeBounced`, `markChequeCleared`, and `resolveSyncConflict`, all of which flow through ledger engine functions built in this session.
 * **Manually verified:** DB-level lock testing for concurrency, security check that waivers and penalties enforce `adminId` and emit `AUDIT_LOG`.
 
 ## 6. Dependencies & Deferred Work

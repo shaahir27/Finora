@@ -50,7 +50,9 @@ status: "Built"
   ```
 
 ## 5. Testing & Verification
-* **Automated tests:** none (Tests pending for Session 1 Checkpoint)
+* **Automated tests:**
+  * `apps/web/src/__tests__/waiverPenaltyAudit.test.ts` — verifies that `applyWaiver` and `applyPenalty` produce matching `AUDIT_LOG` rows and reject empty reasons (directly exercises the fee assignment contract that `assignFee` creates).
+  * `apps/web/src/__tests__/reconciliation.test.ts` — verifies that payments against fee assignments correctly enforce balance checks, confirming `assignFee`'s `amount` column is read accurately by downstream ledger logic.
 * **Manually verified:** Bulk assignment resilience, GST rate enforcement on taxable fees.
 
 ## 6. Dependencies & Deferred Work

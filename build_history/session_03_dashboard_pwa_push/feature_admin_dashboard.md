@@ -1,5 +1,10 @@
-# LOG_TEMPLATE
-Use this exact structure for every feature log in `build_history/`. Copy it, replace every `{{PLACEHOLDER}}`, delete nothing else.
+---
+feature: "Admin Dashboard & Management Shell"
+session: "Session 3"
+status: "Built"
+---
+
+# Feature: Admin Dashboard & Management Shell
 
 ## 1. Overview
 * **Name:** Admin Dashboard & Management Shell

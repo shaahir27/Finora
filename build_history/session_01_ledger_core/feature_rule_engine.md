@@ -22,9 +22,12 @@ status: "Built"
 
 ## 4. Core Logic & Necessary Functions
 * **List of functions & files:** Key functions added or modified, and their exact file paths.
-  * `computeDefaulterScore` (`packages/rules/src/defaulterScore.ts`): Calculates a student's risk profile based on overdue days and active anomalies.
+  * `computeDefaulterScore` (`packages/rules/src/defaulterScore.ts`): Calculates a student's risk profile based on days overdue, broken promises, total fee, amount paid, and waived amount.
   ```typescript
-  export function computeDefaulterScore(daysOverdue: number, hasAnomalies: boolean, balance: number): number
+  export function computeDefaulterScore(
+    daysOverdue: number, brokenPromiseCount: number,
+    totalAmount: number | string, totalAmountPaid: number | string, totalWaivedAmount: number | string
+  ): { riskLevel: RiskLevel; riskScore: number; reason: string }
   // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
   * `detectAnomaly` (`packages/rules/src/anomaly.ts`): Flags payments that do not match the expected remaining balance exactly.
@@ -57,7 +60,9 @@ status: "Built"
   ```
 
 ## 5. Testing & Verification
-* **Automated tests:** none (Tests pending for Session 1 Checkpoint)
+* **Automated tests:**
+  * `apps/web/tests/session3.test.ts` — tests `computeDefaulterScore` formula: verifies partially-paid students score lower than identically-overdue students who paid nothing, and higher days overdue yields a higher risk score.
+  * `apps/web/src/__tests__/reconciliation.test.ts` — indirectly verifies `detectAnomaly` and `detectDuplicateRef` through `recordPayment` tests (off-by-one trap, UPI idempotency).
 * **Manually verified:** Evaluated edge cases in anomaly detection (e.g., partial payments).
 
 ## 6. Dependencies & Deferred Work

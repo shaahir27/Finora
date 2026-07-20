@@ -32,7 +32,9 @@ status: "Built"
   ```
 
 ## 5. Testing & Verification
-* **Automated tests:** none (Tests pending for Session 2 Checkpoint)
+* **Automated tests:**
+  * `apps/web/tests/session3.test.ts` — tests that `enqueueOfflinePayment` rejects `channel: upi` with an explicit error, and that `syncOfflinePayment` returns `{ success: false, conflictReason }` (rather than throwing or posting) when the synced amount would cause an overpayment.
+  * `apps/web/src/__tests__/reconciliation.test.ts` — tests `resolveSyncConflict` rejects an empty `reason` string (enforcing the non-negotiable audit principle).
 * **Manually verified:** Verified that UPI is strictly rejected by the server action.
 
 ## 6. Dependencies & Deferred Work

@@ -31,7 +31,8 @@ status: "Built"
   ```
 
 ## 5. Testing & Verification
-* **Automated tests:** none (Tests pending for Session 2 Checkpoint)
+* **Automated tests:**
+  * `apps/web/src/__tests__/reconciliation.test.ts` — tests the full cheque state machine: `markChequeBounced` requires a non-empty reason, writes an `AUDIT_LOG` row with `action: cheque_bounced`, triggers `computeDefaulterScore` recompute (cross-engine dependency), and rejects transitions from non-`cheque_pending` states. `markChequeCleared` correctly flips `cheque_pending` → `posted` and rejects if the transaction is not in `cheque_pending`.
 * **Manually verified:** Verified that bouncing a cheque properly transitions the state to terminal `reversed` and recalculates the defaulter score.
 
 ## 6. Dependencies & Deferred Work
