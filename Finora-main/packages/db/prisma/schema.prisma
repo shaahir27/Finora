@@ -1,0 +1,424 @@
+// Smart School FinTech Platform — Prisma Schema
+// Source of truth: docs/database_design.md
+// Every field name, type, nullability, and constraint matches that document exactly.
+// Do NOT rename columns. Other sessions depend on these exact names per AI_INSTRUCTIONS.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums — exactly as specified in database_design.md
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  admin
+  parent
+}
+
+/// docs/database_design.md — STUDENT.status (added Phase 15, supersedes is_active from Phase 14)
+/// A boolean couldn't express WHY a student left — reason matters for record-keeping.
+enum StudentStatus {
+  active
+  withdrawn
+  graduated
+  transferred
+}
+
+/// docs/database_design.md — STUDENT.balance_disposition (added Phase 15)
+/// Required by updateStudentStatus whenever a nonzero balance exists and status is non-active.
+enum BalanceDisposition {
+  write_off
+  carry_forward
+}
+
+/// docs/database_design.md — FEE_TYPE.gst_treatment
+/// Admin-set, never inferred. GST treatment is per fee type.
+enum GstTreatment {
+  exempt
+  taxable
+}
+
+/// docs/database_design.md — TRANSACTION.channel
+enum PaymentChannel {
+  upi
+  cash
+  cheque
+}
+
+/// docs/database_design.md — TRANSACTION.reconciliation_status
+/// Lives directly on TRANSACTION — reconciliation is a live column state, not a batch process.
+/// Do NOT normalize into a separate table.
+enum ReconciliationStatus {
+  posted
+  flagged
+  reversed
+  cheque_pending
+}
+
+// ---------------------------------------------------------------------------
+// SCHOOL
+// docs/database_design.md — SCHOOL entity
+// ---------------------------------------------------------------------------
+model School {
+  id   String @id @default(uuid())
+  name String
+
+  users       User[]
+  students    Student[]
+  feeTypes    FeeType[]
+  feeAssignments FeeAssignment[]
+  transactions   Transaction[]
+  defaulterScores DefaulterScore[]
+  offlineSyncConflicts OfflineSyncConflict[]
+
+  @@map("schools")
+}
+
+// ---------------------------------------------------------------------------
+// USER
+// docs/database_design.md — USER entity (nullability changed Phase 11)
+// Constraint: parent must have at least one of email/phone non-null.
+//             admin must have email non-null.
+// These are enforced via application-layer validation in createParentAccount /
+// admin provisioning — Prisma CHECK constraints are added via raw migration SQL.
+// ---------------------------------------------------------------------------
+model User {
+  id       String   @id @default(uuid())
+  role     UserRole
+  /// Nullable for parent (phone OTP is primary login — Phase 11). Required for admin.
+  email    String?
+  /// Added Phase 11. E.164 format (+91XXXXXXXXXX). Required for parent, nullable for admin.
+  phone    String?
+  schoolId String   @map("school_id")
+  school   School   @relation(fields: [schoolId], references: [id])
+
+  parentLink   ParentLink?
+  auditLogs    AuditLog[]
+  waivers      Waiver[]        @relation("ApprovedByUser")
+  resolvedConflicts OfflineSyncConflict[] @relation("ResolvedByUser")
+  submittedConflicts OfflineSyncConflict[] @relation("SubmittedByUser")
+
+  @@index([schoolId])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// PARENT_LINK
+// docs/database_design.md — PARENT_LINK entity
+// Many-to-many with STUDENT via guardian_of join table.
+// ---------------------------------------------------------------------------
+model ParentLink {
+  id     String @id @default(uuid())
+  userId String @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  guardianOf GuardianOf[]
+
+  @@map("parent_links")
+}
+
+/// Join table for the PARENT_LINK *—* STUDENT many-to-many relationship.
+/// One parent can have multiple linked children; one student can have multiple guardians.
+model GuardianOf {
+  parentLinkId String     @map("parent_link_id")
+  studentId    String     @map("student_id")
+  parentLink   ParentLink @relation(fields: [parentLinkId], references: [id])
+  student      Student    @relation(fields: [studentId], references: [id])
+
+  @@id([parentLinkId, studentId])
+  @@map("guardian_of")
+}
+
+// ---------------------------------------------------------------------------
+// STUDENT
+// docs/database_design.md — STUDENT entity
+// Phase 14: admission_number (nullable, unique per school_id when present)
+// Phase 15: status enum (supersedes is_active boolean), status_changed_at, balance_disposition
+// NEVER hard-deleted while linked FEE_ASSIGNMENT/TRANSACTION rows exist.
+// ---------------------------------------------------------------------------
+model Student {
+  id              String   @id @default(uuid())
+  name            String
+  class           String
+  schoolId        String   @map("school_id")
+  school          School   @relation(fields: [schoolId], references: [id])
+
+  /// School-assigned external ID. Unique per school_id when present.
+  /// Used by bulkImportStudents for dedup — safe to re-run same CSV.
+  admissionNumber String?  @map("admission_number")
+
+  /// Added Phase 15 — supersedes is_active (Phase 14).
+  /// computeDefaulterScore and daily reminder-trigger job both filter on status = 'active'.
+  status          StudentStatus @default(active)
+
+  /// Set when status last changed away from active. Null for always-active students.
+  statusChangedAt DateTime?    @map("status_changed_at")
+
+  /// Required by updateStudentStatus when nonzero balance exists and status is non-active.
+  /// write_off → applyWaiver for full remaining balance. carry_forward → no financial change.
+  balanceDisposition BalanceDisposition? @map("balance_disposition")
+
+  feeAssignments FeeAssignment[]
+  defaulterScores DefaulterScore[]
+  guardianOf     GuardianOf[]
+  transactions   Transaction[]
+
+  // Partial unique index on (school_id, admission_number) WHERE admission_number IS NOT NULL
+  // — enforces per-school dedup without rejecting students created without an admission number.
+  // This index is created via raw SQL in the migration because Prisma doesn't support partial unique indexes natively.
+  @@index([schoolId])
+  @@index([schoolId, class])
+  @@map("students")
+}
+
+// ---------------------------------------------------------------------------
+// AUDIT_LOG
+// docs/database_design.md — AUDIT_LOG entity
+// Generated automatically by USER actions. Every waiver, penalty, reversal,
+// and cheque-bounce event must produce a row here.
+// Recommended: enforce via DB trigger as a backstop — application layer is not the only guard.
+// ---------------------------------------------------------------------------
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorId     String   @map("actor_id")
+  actor       User     @relation(fields: [actorId], references: [id])
+  /// e.g. waiver_applied, transaction_reversed, cheque_bounced, report_exported
+  action      String
+  beforeState Json     @map("before_state")
+  afterState  Json     @map("after_state")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// FEE_TYPE
+// docs/database_design.md — FEE_TYPE entity
+// Deactivating is_active prevents new assignments but NEVER affects existing ones.
+// ---------------------------------------------------------------------------
+model FeeType {
+  id           String       @id @default(uuid())
+  schoolId     String       @map("school_id")
+  school       School       @relation(fields: [schoolId], references: [id])
+  name         String
+  category     String
+  isActive     Boolean      @default(true) @map("is_active")
+  gstTreatment GstTreatment @map("gst_treatment")
+  /// Only relevant when gstTreatment = taxable. Required when taxable.
+  gstRate      Decimal?     @map("gst_rate") @db.Decimal(5, 2)
+
+  feeAssignments FeeAssignment[]
+
+  @@map("fee_types")
+}
+
+// ---------------------------------------------------------------------------
+// FEE_ASSIGNMENT
+// docs/database_design.md — FEE_ASSIGNMENT entity
+// amount_paid and payment_status are DERIVED, never stored as independent writable fields.
+// They are computed from TRANSACTION rows on read.
+// ---------------------------------------------------------------------------
+model FeeAssignment {
+  id          String   @id @default(uuid())
+  studentId   String   @map("student_id")
+  student     Student  @relation(fields: [studentId], references: [id])
+  feeTypeId   String   @map("fee_type_id")
+  feeType     FeeType  @relation(fields: [feeTypeId], references: [id])
+  schoolId    String   @map("school_id")
+  school      School   @relation(fields: [schoolId], references: [id])
+  amount      Decimal  @db.Decimal(12, 2)
+  dueDate     DateTime @map("due_date") @db.Date
+
+  /// Tracks reminder escalation — prevents re-firing the same tier.
+  lastTriggeredTier Int @default(0) @map("last_triggered_tier")
+
+  // NOTE: amount_paid is derived (SUM of posted TRANSACTION.amount for this assignment).
+  // payment_status is derived from amount_paid, amount, and due_date.
+  // Both are computed in application layer / DB view — NOT stored columns.
+  // See financial_engine.md §1 and packages/rules/src/feeComputation.ts.
+
+  transactions Transaction[]
+  waivers      Waiver[]
+
+  @@index([studentId])
+  @@index([feeTypeId])
+  @@index([dueDate])
+  @@map("fee_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// TRANSACTION
+// docs/database_design.md — TRANSACTION entity
+// reconciliation_status lives directly on TRANSACTION — never normalize into a separate table.
+// TRANSACTION.amount CHECK (amount > 0) enforced at DB level.
+// Partial unique index on (channel, ref_number) WHERE channel = 'upi' — webhook idempotency.
+// ---------------------------------------------------------------------------
+model Transaction {
+  id                  String              @id @default(uuid())
+  feeAssignmentId     String              @map("fee_assignment_id")
+  feeAssignment       FeeAssignment       @relation(fields: [feeAssignmentId], references: [id])
+  studentId           String              @map("student_id")
+  student             Student             @relation(fields: [studentId], references: [id])
+  schoolId            String              @map("school_id")
+  school              School              @relation(fields: [schoolId], references: [id])
+  channel             PaymentChannel
+  /// CHECK (amount > 0) enforced at DB level in migration SQL.
+  amount              Decimal             @db.Decimal(12, 2)
+  /// Required for upi/cheque; used for idempotency and duplicate checks.
+  refNumber           String?             @map("ref_number")
+  reconciliationStatus ReconciliationStatus @default(posted) @map("reconciliation_status")
+  status              String              @default("active")
+  postedAt            DateTime            @default(now()) @map("posted_at")
+
+  waivers      Waiver[]
+  penalties    Penalty[]
+  anomalyFlag  AnomalyFlag?
+
+  // Indexes — see database_design.md Indexes section
+  @@index([feeAssignmentId])
+  @@index([studentId])
+  @@index([schoolId, reconciliationStatus])
+  @@index([schoolId, postedAt])
+  // Partial unique index on (channel, ref_number) WHERE channel = 'upi'
+  // — created via raw migration SQL (Prisma doesn't support partial unique natively)
+  @@map("transactions")
+}
+
+// ---------------------------------------------------------------------------
+// WAIVER
+// docs/database_design.md — WAIVER entity
+// approved_by and reason are NOT NULL at DB level — this is a hard constraint, not just validation.
+// A waiver reduces effective amount owed, never alters historical transaction record.
+// ---------------------------------------------------------------------------
+model Waiver {
+  id             String        @id @default(uuid())
+  /// May attach to a fee assignment context ahead of a transaction, or an existing transaction.
+  transactionId  String?       @map("transaction_id")
+  transaction    Transaction?  @relation(fields: [transactionId], references: [id])
+  feeAssignmentId String       @map("fee_assignment_id")
+  feeAssignment  FeeAssignment @relation(fields: [feeAssignmentId], references: [id])
+  /// NOT NULL at DB level — no waiver can exist without an approver.
+  approvedById   String        @map("approved_by")
+  approvedBy     User          @relation("ApprovedByUser", fields: [approvedById], references: [id])
+  /// NOT NULL at DB level — no waiver can exist without a reason. Audit trail requirement.
+  reason         String
+  amount         Decimal       @db.Decimal(12, 2)
+
+  @@index([transactionId])
+  @@map("waivers")
+}
+
+// ---------------------------------------------------------------------------
+// PENALTY
+// docs/database_design.md — PENALTY entity
+// reason is NOT NULL at DB level.
+// Manually applied by admin action (applyPenalty), reason-tagged identically to waivers.
+// ---------------------------------------------------------------------------
+model Penalty {
+  id            String      @id @default(uuid())
+  transactionId String      @map("transaction_id")
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  amount        Decimal     @db.Decimal(12, 2)
+  /// NOT NULL at DB level.
+  reason        String
+
+  @@index([transactionId])
+  @@map("penalties")
+}
+
+// ---------------------------------------------------------------------------
+// DEFAULTER_SCORE
+// docs/database_design.md — DEFAULTER_SCORE entity
+// risk_level maps to high | medium | low per formula in business_rules.md.
+// Historical rows are never deleted — remain visible on Student Profile.
+// ---------------------------------------------------------------------------
+model DefaulterScore {
+  id             String   @id @default(uuid())
+  studentId      String   @map("student_id")
+  student        Student  @relation(fields: [studentId], references: [id])
+  schoolId       String   @map("school_id")
+  school         School   @relation(fields: [schoolId], references: [id])
+  /// Numeric score from the formula. risk_level is derived from this for display.
+  riskLevel      Int      @map("risk_level")
+  /// Plain rule-derived explanation — always available regardless of AI narration status.
+  computedReason String   @map("computed_reason")
+  computedAt     DateTime @default(now()) @map("computed_at")
+
+  @@index([studentId])
+  @@index([schoolId, riskLevel])
+  @@map("defaulter_scores")
+}
+
+// ---------------------------------------------------------------------------
+// ANOMALY_FLAG
+// docs/database_design.md — ANOMALY_FLAG entity
+// Session 1 stub — full anomaly narration (Gemini) is Session 4.
+// detectAnomaly runs synchronously inside recordPayment in Session 1.
+// ---------------------------------------------------------------------------
+model AnomalyFlag {
+  id             String      @id @default(uuid())
+  transactionId  String      @unique @map("transaction_id")
+  transaction    Transaction @relation(fields: [transactionId], references: [id])
+  schoolId       String      @map("school_id")
+  /// remaining balance at time of payment, not original fee amount
+  expectedAmount Decimal     @map("expected_amount") @db.Decimal(12, 2)
+  receivedAmount Decimal     @map("received_amount") @db.Decimal(12, 2)
+  /// rule-generated, e.g. amount_mismatch, duplicate_channel_ref
+  flagReason     String      @map("flag_reason")
+  /// Gemini-generated, asynchronous (Session 4). May be absent — UI falls back to flagReason.
+  narration      String?
+  resolved       Boolean     @default(false)
+  /// Added Phase 8 — an anomaly resolution is as audit-worthy as a waiver.
+  resolvedById   String?     @map("resolved_by")
+  resolvedAt     DateTime?   @map("resolved_at")
+  /// Non-nullable at the point resolved = true. Nullable while still open.
+  resolutionReason String?   @map("resolution_reason")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  @@index([schoolId, resolved])
+  @@map("anomaly_flags")
+}
+
+// ---------------------------------------------------------------------------
+// OFFLINE_SYNC_CONFLICT — added Phase 10
+// docs/database_design.md — OFFLINE_SYNC_CONFLICT entity
+// Deliberately school-scoped (not user/device-scoped) so any admin at the school
+// can see and resolve a stuck conflict, not just the one whose device queued it.
+// local_id unique constraint prevents duplicate escalation for the same queued entry.
+// ---------------------------------------------------------------------------
+model OfflineSyncConflict {
+  id              String      @id @default(uuid())
+  /// Deliberately school-scoped, not device/user-scoped.
+  schoolId        String      @map("school_id")
+  school          School      @relation(fields: [schoolId], references: [id])
+  submittedById   String      @map("submitted_by")
+  submittedBy     User        @relation("SubmittedByUser", fields: [submittedById], references: [id])
+  /// Client-generated UUID — idempotency anchor. Unique constraint prevents duplicate escalation.
+  localId         String      @unique @map("local_id")
+  feeAssignmentId String      @map("fee_assignment_id")
+  /// cash | cheque only — never upi per business_rules.md Offline Payment Entry Strategy
+  channel         PaymentChannel
+  amount          Decimal     @db.Decimal(12, 2)
+  /// When the entry was originally created offline, not when the sync attempt ran.
+  queuedAt        DateTime    @map("queued_at")
+  conflictReason  String      @map("conflict_reason")
+  resolved        Boolean     @default(false)
+  resolvedById    String?     @map("resolved_by")
+  resolvedBy      User?       @relation("ResolvedByUser", fields: [resolvedById], references: [id])
+  resolvedAt      DateTime?   @map("resolved_at")
+  /// Non-nullable once resolved = true.
+  resolutionAction String?    @map("resolution_action")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@index([schoolId, resolved])
+  @@map("offline_sync_conflicts")
+}
