@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllEntries, syncOfflinePayment, updateEntryStatus, removeEntry, OfflinePaymentEntry } from "@/lib/offlineQueue";
-import { getSyncConflicts, resolveSyncConflict } from "@/app/actions/offlineSync";
+import { getAllEntries, updateEntryStatus, removeEntry, type OfflinePaymentEntry } from "@/lib/offlineQueue";
+import { syncOfflinePayment, getSyncConflicts, resolveSyncConflict } from "@/app/actions/offlineSync";
 import { GlassCard } from "@/components/GlassCard";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { OfflineSyncStatusBadge } from "@/components/OfflineSyncStatusBadge";

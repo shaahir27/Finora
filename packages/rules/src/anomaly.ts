@@ -1,4 +1,4 @@
-import { RISK_CONFIG } from "./config.js";
+import { RISK_CONFIG } from "./config";
 
 /**
  * Evaluates whether an anomaly should be flagged for a transaction based on amount mismatch.

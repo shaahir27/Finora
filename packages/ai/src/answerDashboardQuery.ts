@@ -12,7 +12,7 @@
  * On failure: returns an error string. UI shows a plain error state (not a stuck spinner).
  */
 
-import { generateContent } from "./geminiClient.js";
+import { generateContent } from "./geminiClient";
 
 export interface LedgerContext {
   totalCollected: number;

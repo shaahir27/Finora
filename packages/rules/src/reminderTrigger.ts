@@ -1,4 +1,4 @@
-import { RISK_CONFIG } from "./config.js";
+import { RISK_CONFIG } from "./config";
 
 /**
  * Evaluates whether a reminder should be triggered based on days overdue and last triggered tier.

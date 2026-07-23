@@ -1,11 +1,11 @@
-export * from "./config.js";
-export * from "./feeComputation.js";
-export { detectAnomaly } from "./anomaly.js";
-export { detectDuplicateRef, type DuplicateRefInput } from "./duplicateRef.js";
-export { computeDefaulterScore } from "./defaulterScore.js";
-export { evaluateReminderTrigger } from "./reminderTrigger.js";
+export * from "./config";
+export * from "./feeComputation";
+export { detectAnomaly } from "./anomaly";
+export { detectDuplicateRef, type DuplicateRefInput } from "./duplicateRef";
+export { computeDefaulterScore } from "./defaulterScore";
+export { evaluateReminderTrigger } from "./reminderTrigger";
 export {
   calculateAmountPaid,
   calculateWaivedAmount,
   calculateRemainingBalance,
-} from "./feeComputation.js";
+} from "./feeComputation";

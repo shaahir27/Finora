@@ -14,7 +14,7 @@
  * called from within copilotQuery, which is a server-only function).
  */
 
-import { generateContent } from "./geminiClient.js";
+import { generateContent } from "./geminiClient";
 
 type Role = "admin" | "parent";
 

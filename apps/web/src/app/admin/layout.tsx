@@ -1,8 +1,46 @@
+"use client";
+
 import Link from "next/link";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { GlassCard } from "@/components/GlassCard";
 
+const SESSION_KEY = "finora_admin_authed";
+const PUBLIC_PATHS = ["/admin/login"];
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+    if (isPublic) {
+      setAuthChecked(true);
+      return;
+    }
+    const authed = sessionStorage.getItem(SESSION_KEY) === "1";
+    if (!authed) {
+      router.replace("/admin/login");
+    } else {
+      setAuthChecked(true);
+    }
+  }, [pathname, router]);
+
+  // On login page, render children directly (no shell)
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+    return <>{children}</>;
+  }
+
+  // Auth check pending — show nothing to avoid flash
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-bg-base flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(76,175,130,0.4)", borderTopColor: "transparent" }} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-bg-base flex flex-col md:flex-row">
       {/* Sidebar Navigation */}
@@ -35,11 +73,22 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <Link href="/admin/ocr" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
             OCR Upload
           </Link>
+          <Link href="/admin/reminders" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
+            Reminders Queue
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-border-glass">
           <p className="text-sm text-text-secondary">Logged in as</p>
           <p className="text-sm font-medium text-text-primary truncate">admin@school.edu</p>
+          <button
+            id="admin-logout-btn"
+            type="button"
+            onClick={() => { sessionStorage.removeItem(SESSION_KEY); router.replace("/admin/login"); }}
+            className="mt-2 text-xs text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Sign out
+          </button>
         </div>
       </GlassCard>
 

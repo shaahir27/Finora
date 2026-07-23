@@ -22,8 +22,8 @@
  * both roles via the role parameter. See AI_INSTRUCTIONS.md Section 5.
  */
 
-import { generateContent, type GeminiContent } from "./geminiClient.js";
-import { answerHowDoI } from "./answerHowDoI.js";
+import { generateContent, type GeminiContent } from "./geminiClient";
+import { answerHowDoI } from "./answerHowDoI";
 
 // ---------------------------------------------------------------------------
 // ADMIN COPILOT WHITELIST

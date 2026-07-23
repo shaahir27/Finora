@@ -10,10 +10,10 @@ const prisma = new PrismaClient();
 async function main() {
   // Idempotent: upsert so re-running the seed is safe
   const school = await prisma.school.upsert({
-    where: { id: "seed-school-01" },
-    update: {},
+    where: { id: "demo-school-id" },
+    update: { name: "Demo School" },
     create: {
-      id: "seed-school-01",
+      id: "demo-school-id",
       name: "Demo School",
     },
   });
@@ -24,7 +24,7 @@ async function main() {
     create: {
       id: "seed-admin-01",
       role: "admin",
-      email: "admin@demo.school",
+      email: "admin@school.edu",
       phone: null,
       schoolId: school.id,
     },

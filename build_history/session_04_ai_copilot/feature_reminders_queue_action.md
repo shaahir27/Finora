@@ -1,5 +1,5 @@
 ---
-feature_name: "Reminders Queue Action"
+feature_name: "Reminders Queue"
 session: "Session 4"
 status: "completed"
 type: "core_feature"
@@ -13,6 +13,7 @@ Provides the backend logic for reading and updating the status of drafted AI rem
 ## Core Logic & Necessary Functions
 - `apps/web/src/app/actions/reminders.ts` -> `getRemindersQueue`: Joins `ReminderLog` with `FeeAssignment` and `Student` for school-scoped reads. Computes `isStale` dynamically based on current remaining balance.
 - `apps/web/src/app/actions/reminders.ts` -> `markReminderSent`: Explicitly transitions a reminder's status from `logged` to `simulated_sent`. This is the only function allowed to flip status.
+- `apps/web/src/app/admin/reminders/page.tsx`: Reminders Queue UI. Table shows studentName, feeType, tier, channel, draftedText (expandable), status, isStale flag. "Mark as Sent" button calls `markReminderSent` with optimistic UI update. Filter tabs: All / Pending / Sent.
 
 ## Database Schema Impact
 - Interacts with the `ReminderLog` table added in this session.

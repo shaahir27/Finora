@@ -27,6 +27,8 @@ All features follow the non-blocking ordering guarantee. Narration occurs async-
 - Updated `schema.prisma`:
   - Added `ReminderLog` model (and Enums: `ReminderChannel`, `ReminderStatus`) for storing drafted and sent reminders.
   - Added `OcrStaging` model (see OCR upload feature).
+  - Added `PushSubscription` model (Session 3 feature, added to schema in this session).
+- **Migration Note:** These models were added to `schema.prisma` during Sessions 3/4 but the migration `20260723135754_session4_push_ocr_reminders` was generated and deployed in a later debug pass (2026-07-23) when the tables were found missing from the live Supabase DB. The schema was always correct; the migration file was the gap.
 
 ## Testing & Verification
-- Unit tests in `session4.test.ts` verify that `narrateAnomalyAction` does not affect prior write results and is decoupled from transactions.
+- Unit tests in `session4.test.ts` are specified but not yet implemented — this is deferred technical debt. Structural separation between AI logic and the write path is enforced at the code level (whitelist array, `"use server"` boundary) rather than automated tests at this stage.

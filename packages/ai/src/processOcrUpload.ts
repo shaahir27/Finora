@@ -10,7 +10,7 @@
  * explicit admin confirmation. See api_specification.md — confirmOcrEntry.
  */
 
-import { generateContent } from "./geminiClient.js";
+import { generateContent } from "./geminiClient";
 
 export interface OcrExtractionResult {
   /** Extracted payment amount in INR, or null if not found/ambiguous */

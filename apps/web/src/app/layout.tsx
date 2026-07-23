@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "./Providers";
 import { IosBanner } from "@/components/IosBanner";
@@ -6,11 +6,14 @@ import "@/globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
+export const viewport: Viewport = {
+  themeColor: "#1B1712",
+};
+
 export const metadata: Metadata = {
   title: "Finora",
   description: "Smart School FinTech Platform",
   manifest: "/manifest.json",
-  themeColor: "#1B1712",
 };
 
 export default function RootLayout({

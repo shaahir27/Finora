@@ -12,7 +12,7 @@
  * On failure: returns null. UI MUST fall back to DEFAULTER_SCORE.computed_reason.
  */
 
-import { generateContent } from "./geminiClient.js";
+import { generateContent } from "./geminiClient";
 
 export interface DefaulterInsightInput {
   studentName: string;

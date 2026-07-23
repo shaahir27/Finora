@@ -1,4 +1,4 @@
-import { RISK_CONFIG, type RiskLevel, scoreToRiskLevel } from "./config.js";
+import { RISK_CONFIG, type RiskLevel, scoreToRiskLevel } from "./config";
 
 /**
  * Computes the defaulter risk score for a student based on their active fee assignments.

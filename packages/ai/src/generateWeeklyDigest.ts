@@ -13,7 +13,7 @@
  * internally on the first turn rather than having a separate summarization path.
  */
 
-import { generateContent } from "./geminiClient.js";
+import { generateContent } from "./geminiClient";
 
 export interface WeeklyDigestInput {
   schoolName: string;

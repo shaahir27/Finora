@@ -16,4 +16,6 @@ Implemented the "Rules decide, AI narrates" layer across 7 distinct features, al
 - **Scoping**: All DB interactions remain tightly school-scoped before reaching the AI. Gemini receives pre-fetched context, never raw DB access.
 
 ## Status
-Session 4 completed. All automated test assertions passed, validating structural separation between AI logic and core financial engine logic.
+Session 4 feature code complete. The structural separation between AI logic and core financial engine logic is enforced at the code level (whitelist array, `"use server"` boundary, non-blocking call pattern). Automated test assertions in `session4.test.ts` are specified but not yet implemented — deferred to a future cleanup pass.
+
+**Migration gap resolved (2026-07-23):** The `push_subscriptions`, `ocr_staging`, and `reminder_logs` tables were added to `schema.prisma` during Sessions 3/4 but the migration was never generated. This caused 500 errors on the dashboard after Supabase was unpaused. A new migration (`20260723135754_session4_push_ocr_reminders`) was generated and deployed to fix this.

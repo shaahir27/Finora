@@ -16,7 +16,7 @@
  * On failure: returns null. UI MUST fall back to ANOMALY_FLAG.flag_reason.
  */
 
-import { generateContent } from "./geminiClient.js";
+import { generateContent } from "./geminiClient";
 
 export interface AnomalyContext {
   flagReason: string;
@@ -24,7 +24,7 @@ export interface AnomalyContext {
   receivedAmount: number;
   studentName: string;
   channel: string;
-  refNumber?: string;
+  refNumber?: string | undefined;
 }
 
 /**

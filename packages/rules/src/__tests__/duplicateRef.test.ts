@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { detectDuplicateRef } from "../duplicateRef.js";
+import { detectDuplicateRef } from "../duplicateRef";
 
 describe("detectDuplicateRef", () => {
   it("returns isDuplicate=false when there are no existing transactions", () => {

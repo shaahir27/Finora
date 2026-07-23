@@ -258,7 +258,7 @@ export async function processOcrUploadAction(
       extractedAmount: extraction.amount ?? null,
       extractedDate: extraction.date ? new Date(extraction.date) : null,
       extractedRefNumber: extraction.refNumber ?? null,
-      rawExtraction: extraction as unknown as Record<string, unknown>,
+      rawExtraction: extraction as any,
       confirmed: false, // HARD CONSTRAINT: always false here
     },
   });

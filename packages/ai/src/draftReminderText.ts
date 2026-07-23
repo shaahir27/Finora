@@ -10,11 +10,11 @@
  * logged, human "mark sent" action. This function only DRAFTS — nothing sends.
  */
 
-import { generateContent } from "./geminiClient.js";
+import { generateContent } from "./geminiClient";
 
 export interface ReminderDraftInput {
   studentName: string;
-  guardianName?: string;
+  guardianName?: string | undefined;
   feeTypeName: string;
   amountDue: number;
   dueDate: string; // ISO date string
