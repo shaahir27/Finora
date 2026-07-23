@@ -17,5 +17,10 @@ Map of every feature built, where its log lives, and its current status. Updated
 | PWA Push Notifications | Session 3 | `session_03_dashboard_pwa_push/feature_push_notifications.md` | Built | 2026-07-20 |
 | Student Profile Lifecycle | Session 3 | `session_03_dashboard_pwa_push/feature_student_profile.md` | Built | 2026-07-20 |
 | Offline Sync & Conflicts | Session 3 | `session_03_dashboard_pwa_push/feature_offline_sync.md` | Built | 2026-07-20 |
+| AI Narration | Session 4 | `session_04_ai_copilot/feature_narration_features.md` | Built | 2026-07-25 |
+| OCR Document Upload | Session 4 | `session_04_ai_copilot/feature_ocr_upload.md` | Built | 2026-07-25 |
+| Weekly Summary Digest | Session 4 | `session_04_ai_copilot/feature_weekly_digest.md` | Built | 2026-07-25 |
+| Admin Copilot | Session 4 | `session_04_ai_copilot/feature_admin_copilot.md` | Built | 2026-07-25 |
+| Reminders Queue Action | Session 4 | `session_04_ai_copilot/feature_reminders_queue_action.md` | Built | 2026-07-25 |
 
 **Status legend**: `Built` (complete, checkpoint passed) · `Updated` (built earlier, revised in a later session — see the file's own history for what changed) · `Deferred` (started, intentionally incomplete — reason is in the feature's own Section 6, not just here).

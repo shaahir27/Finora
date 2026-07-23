@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@smart-school/ai": "workspace:*",
     "@smart-school/db": "workspace:*",
     "@smart-school/payments": "workspace:*",
     "@smart-school/rules": "workspace:*",
@@ -33,7 +34,7 @@
     "eslint": "^9.14.0",
     "eslint-config-next": "15.0.3",
     "postcss": "^8.5.20",
-    "tailwindcss": "^4.3.3",
+    "tailwindcss": "^3.4.19",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
   }

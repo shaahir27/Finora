@@ -249,6 +249,7 @@ model FeeAssignment {
 
   transactions Transaction[]
   waivers      Waiver[]
+  reminderLogs ReminderLog[]
 
   @@index([studentId])
   @@index([feeTypeId])
@@ -443,3 +444,72 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
+// ---------------------------------------------------------------------------
+// OCR_STAGING — added Session 4 (AI Layer)
+// docs/database_design.md — OCR_STAGING entity
+// processOcrUpload writes here with confirmed: false.
+// confirmOcrEntry is the ONLY function that may flip confirmed = true and post a TRANSACTION.
+// A row with confirmed = false MUST NOT affect any dashboard number or balance calculation.
+// ---------------------------------------------------------------------------
+model OcrStaging {
+  id                    String    @id @default(uuid())
+  schoolId              String    @map("school_id")
+  /// The Supabase Storage URL passed to Gemini Vision
+  imageUrl              String    @map("image_url")
+  /// Fields extracted by Gemini — structured JSON
+  extractedAmount       Decimal?  @map("extracted_amount") @db.Decimal(12, 2)
+  extractedDate         DateTime? @map("extracted_date")
+  extractedRefNumber    String?   @map("extracted_ref_number")
+  /// Raw extraction payload from Gemini (for display/correction UI)
+  rawExtraction         Json?     @map("raw_extraction")
+  /// Always false until confirmOcrEntry runs. Never auto-flipped.
+  confirmed             Boolean   @default(false)
+  confirmedAt           DateTime? @map("confirmed_at")
+  /// Set by confirmOcrEntry — links to the TRANSACTION that was posted
+  confirmedTransactionId String?  @map("confirmed_transaction_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@map("ocr_staging")
+}
+
+// ---------------------------------------------------------------------------
+// REMINDER_LOG — added Session 4 (AI Layer)
+// docs/database_design.md — REMINDER_LOG entity
+// draftReminderText writes here with status: logged.
+// markReminderSent is the ONLY function that changes status from logged.
+// WhatsApp/SMS → simulated_sent (no real send). Email → sent or failed (Session 6).
+// ---------------------------------------------------------------------------
+
+enum ReminderChannel {
+  whatsapp
+  sms
+  email
+}
+
+enum ReminderStatus {
+  logged
+  simulated_sent
+  sent
+  failed
+}
+
+model ReminderLog {
+  id              String          @id @default(uuid())
+  feeAssignmentId String          @map("fee_assignment_id")
+  feeAssignment   FeeAssignment   @relation(fields: [feeAssignmentId], references: [id])
+  /// The AI-drafted message content — reviewed by admin before marking sent
+  draftedText     String          @map("drafted_text")
+  tier            Int             /// 1 | 7 | 14 days overdue — reminder tier from business_rules.md §6
+  channel         ReminderChannel
+  status          ReminderStatus  @default(logged)
+  /// Populated by markReminderSent on Resend failure (email channel, Session 6)
+  dispatchError   String?         @map("dispatch_error")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  sentAt          DateTime?       @map("sent_at")
+
+  @@index([feeAssignmentId])
+  @@index([status])
+  @@map("reminder_logs")
+}

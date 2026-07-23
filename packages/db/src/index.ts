@@ -20,12 +20,16 @@ export type {
   DefaulterScore,
   AnomalyFlag,
   OfflineSyncConflict,
+  OcrStaging,
+  ReminderLog,
   UserRole,
   StudentStatus,
   BalanceDisposition,
   GstTreatment,
   PaymentChannel,
   ReconciliationStatus,
+  ReminderChannel,
+  ReminderStatus,
 } from "@prisma/client";
 
 // Singleton client for server-side use only.
