@@ -107,31 +107,100 @@ export async function getRemindersQueue(
   return { reminders: mapped, nextCursor };
 }
 
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_key");
+
 /**
  * Marks a reminder as sent.
  *
  * WhatsApp/SMS: changes status to simulated_sent (no real delivery — Governing Principle 3).
- * Email: Session 6 will wire this to Resend. For now, marks as simulated_sent also.
- *
- * This is the ONLY function that may change a reminder's status from "logged".
- * The admin has already reviewed the drafted text before calling this.
+ * Email: Sends via Resend if parent email exists.
  */
 export async function markReminderSent(reminderLogId: string): Promise<void> {
-  const log = await prisma.reminderLog.findUnique({ where: { id: reminderLogId } });
+  const log = await prisma.reminderLog.findUnique({
+    where: { id: reminderLogId },
+    include: {
+      feeAssignment: {
+        include: {
+          student: {
+            include: {
+              guardianOf: {
+                include: {
+                  parentLink: {
+                    include: {
+                      user: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  
   if (!log) throw new Error("Reminder log not found");
 
   if (log.status !== "logged") {
     throw new Error(`Reminder is already in status '${log.status}' — cannot mark as sent.`);
   }
 
-  // Session 6: add real Resend email dispatch here for log.channel === "email"
-  // For now all channels use simulated_sent (Governing Principle 3 compliance)
+  if (log.channel === "email") {
+    // Find parent email
+    const guardians = log.feeAssignment.student.guardianOf;
+    const parentEmail = guardians.find((g) => g.parentLink.user.email)?.parentLink.user.email;
 
-  await prisma.reminderLog.update({
-    where: { id: reminderLogId },
-    data: {
-      status: "simulated_sent",
-      sentAt: new Date(),
-    },
-  });
+    if (!parentEmail) {
+      // Missing email — action succeeds as no-op per api_specification.md, but is distinct
+      // Wait, api_specification.md: "If no email is on file, the action still succeeds as a no-op dispatch and the UI must surface 'no email on file'"
+      // To surface "no email on file" in the UI without a dedicated status, we can set it to failed with dispatchError
+      // Let's set dispatchError for this special case
+      await prisma.reminderLog.update({
+        where: { id: reminderLogId },
+        data: {
+          status: "failed",
+          dispatchError: "no email on file",
+          sentAt: new Date(),
+        },
+      });
+      return;
+    }
+
+    try {
+      await resend.emails.send({
+        from: "Finora <noreply@finora.school>",
+        to: parentEmail,
+        subject: `Payment Reminder - Tier ${log.tier}`,
+        text: log.draftedText,
+      });
+
+      await prisma.reminderLog.update({
+        where: { id: reminderLogId },
+        data: {
+          status: "sent",
+          sentAt: new Date(),
+        },
+      });
+    } catch (err: any) {
+      await prisma.reminderLog.update({
+        where: { id: reminderLogId },
+        data: {
+          status: "failed",
+          dispatchError: err.message || "Unknown email dispatch error",
+          sentAt: new Date(),
+        },
+      });
+    }
+  } else {
+    // WhatsApp/SMS
+    await prisma.reminderLog.update({
+      where: { id: reminderLogId },
+      data: {
+        status: "simulated_sent",
+        sentAt: new Date(),
+      },
+    });
+  }
 }

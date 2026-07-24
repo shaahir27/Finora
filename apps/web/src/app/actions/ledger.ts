@@ -17,7 +17,7 @@ import {
   computeDefaulterScore,
   type DuplicateRefInput,
 } from "@smart-school/rules";
-import { notifySchoolAdmins } from "./push";
+import { notifySchoolAdmins, sendPushNotification } from "./push";
 
 /**
  * The core payment recording function.
@@ -186,6 +186,20 @@ export async function recordPayment(
       title: "Payment Received",
       body: `A payment of ₹${result.transaction.amount} was recorded.`,
       url: `/admin/students/${result.transaction.studentId}`,
+    }).catch(console.error);
+
+    // Notify linked parents
+    prisma.guardianOf.findMany({
+      where: { studentId: result.transaction.studentId },
+      include: { parentLink: true }
+    }).then((guardians) => {
+      guardians.forEach((g) => {
+        sendPushNotification(g.parentLink.userId, {
+          title: "Payment Confirmed",
+          body: `A payment of ₹${result.transaction.amount} was recorded for your child.`,
+          url: `/parent/history`,
+        }).catch(console.error);
+      });
     }).catch(console.error);
   } else if (result.anomalyResult?.isAnomalous) {
     notifySchoolAdmins(schoolId, {

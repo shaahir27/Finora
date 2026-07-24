@@ -56,7 +56,7 @@ export const PARENT_COPILOT_WHITELIST: readonly string[] = [
   "getMyChildrenDues",
   "getMyPaymentHistory",
   "answerHowDoI",
-  // Session 5: add "gstExplainerTool" here once built
+  "gstExplainerTool",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -148,6 +148,17 @@ const PARENT_TOOLS = [
       required: ["topic"],
     },
   },
+  {
+    name: "gstExplainerTool",
+    description: "Get the GST tax treatment and rate for a specific fee type to explain it to the parent.",
+    parameters: {
+      type: "object",
+      properties: {
+        feeType: { type: "string", description: "The name of the fee type to get tax rules for" },
+      },
+      required: ["feeType"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -200,6 +211,12 @@ export interface CopilotToolContext {
     status: string;
     postedAt: string;
     feeType: string;
+  }>;
+  /** For gstExplainerTool (parent role) */
+  gstRules?: Array<{
+    feeType: string;
+    gstTreatment: string;
+    gstRate: number | null;
   }>;
   /** School name for context */
   schoolName?: string;
@@ -378,6 +395,13 @@ async function resolveToolCall(
 
     case "getMyPaymentHistory":
       return context.paymentHistory ?? [];
+
+    case "gstExplainerTool":
+      if (!context.gstRules) return { error: "GST rules not available in this context" };
+      const feeTypeStr = String(args.feeType).toLowerCase();
+      const rule = context.gstRules.find((r) => r.feeType.toLowerCase().includes(feeTypeStr) || feeTypeStr.includes(r.feeType.toLowerCase()));
+      if (rule) return rule;
+      return { error: `No GST rules found for fee type '${args.feeType}'` };
 
     default:
       return { error: `Tool '${name}' is not available.` };

@@ -57,6 +57,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <Link href="/admin/defaulters" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
             Defaulter Tracking
           </Link>
+          <Link href="/admin/parents" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
+            Parents
+          </Link>
           <Link href="/admin/students" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
             Student Directory
           </Link>
@@ -67,14 +70,20 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             Settings
           </Link>
           {/* Session 4 — AI Layer */}
+          <Link href="/admin/reminders" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
+            Reminders Queue
+          </Link>
+          <Link href="/admin/receipts" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
+            Receipts
+          </Link>
+          <Link href="/admin/reports" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
+            Reports & Export
+          </Link>
           <Link href="/admin/copilot" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
             ✦ AI Copilot
           </Link>
           <Link href="/admin/ocr" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
             OCR Upload
-          </Link>
-          <Link href="/admin/reminders" className="block px-4 py-2 rounded-md text-text-primary hover:bg-white/10 transition-colors">
-            Reminders Queue
           </Link>
         </nav>
 

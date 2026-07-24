@@ -1,0 +1,50 @@
+{
+  "Navigation": {
+    "dues": "Dues",
+    "history": "History",
+    "copilot": "Copilot",
+    "settings": "Settings",
+    "logout": "Sign Out"
+  },
+  "Dues": {
+    "title": "My Dues",
+    "subtitle": "Overview of your fee payments",
+    "unpaid": "Unpaid",
+    "paid": "Paid",
+    "partially_paid": "Partially Paid",
+    "overdue": "Overdue",
+    "pay_now": "Pay Now",
+    "amount": "Amount",
+    "remaining": "Remaining",
+    "due_date": "Due Date"
+  },
+  "Payment": {
+    "title": "Make Payment",
+    "subtitle": "Secure UPI payment",
+    "amount_to_pay": "Amount to Pay",
+    "proceed": "Proceed to Pay",
+    "success": "Payment successful!",
+    "failed": "Payment failed. Please try again."
+  },
+  "History": {
+    "title": "Payment History",
+    "subtitle": "Past transactions and receipts",
+    "download_receipt": "Receipt",
+    "channel": "Channel",
+    "status": "Status",
+    "date": "Date"
+  },
+  "Settings": {
+    "title": "Settings",
+    "push_notifications": "Push Notifications",
+    "push_description": "Receive alerts when a payment is confirmed.",
+    "language": "Language",
+    "english": "English",
+    "hindi": "Hindi"
+  },
+  "Copilot": {
+    "title": "Finora Assistant",
+    "subtitle": "Ask questions about your dues and payments",
+    "placeholder": "Ask a question..."
+  }
+}

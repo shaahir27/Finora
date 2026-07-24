@@ -1,0 +1,50 @@
+{
+  "Navigation": {
+    "dues": "बकाया",
+    "history": "इतिहास",
+    "copilot": "सहायक",
+    "settings": "सेटिंग्स",
+    "logout": "लॉग आउट"
+  },
+  "Dues": {
+    "title": "मेरा बकाया",
+    "subtitle": "आपके शुल्क भुगतान का अवलोकन",
+    "unpaid": "अदत्त (Unpaid)",
+    "paid": "भुगतान किया गया",
+    "partially_paid": "आंशिक भुगतान",
+    "overdue": "अतिदेय (Overdue)",
+    "pay_now": "अभी भुगतान करें",
+    "amount": "राशि",
+    "remaining": "शेष",
+    "due_date": "नियत तारीख"
+  },
+  "Payment": {
+    "title": "भुगतान करें",
+    "subtitle": "सुरक्षित UPI भुगतान",
+    "amount_to_pay": "भुगतान की जाने वाली राशि",
+    "proceed": "भुगतान के लिए आगे बढ़ें",
+    "success": "भुगतान सफल रहा!",
+    "failed": "भुगतान विफल रहा। कृपया पुनः प्रयास करें।"
+  },
+  "History": {
+    "title": "भुगतान इतिहास",
+    "subtitle": "पिछले लेनदेन और रसीदें",
+    "download_receipt": "रसीद",
+    "channel": "माध्यम",
+    "status": "स्थिति",
+    "date": "तारीख"
+  },
+  "Settings": {
+    "title": "सेटिंग्स",
+    "push_notifications": "पुश सूचनाएं (Push Notifications)",
+    "push_description": "भुगतान की पुष्टि होने पर अलर्ट प्राप्त करें।",
+    "language": "भाषा",
+    "english": "अंग्रेज़ी",
+    "hindi": "हिंदी"
+  },
+  "Copilot": {
+    "title": "Finora सहायक",
+    "subtitle": "अपने बकाया और भुगतान के बारे में प्रश्न पूछें",
+    "placeholder": "कोई प्रश्न पूछें..."
+  }
+}

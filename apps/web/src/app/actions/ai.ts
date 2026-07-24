@@ -15,6 +15,7 @@
  */
 
 import { prisma, type ReminderChannel } from "@smart-school/db";
+import { rateLimit } from "@/lib/rateLimit";
 import {
   narrateDefaulterInsight,
   answerDashboardQuery,
@@ -113,6 +114,11 @@ export async function answerDashboardQueryAction(
   schoolId: string,
   question: string
 ): Promise<string> {
+  const MOCK_ADMIN_ID = "admin-123"; // In a real app, this would come from the auth session
+  if (!rateLimit(`${MOCK_ADMIN_ID}:answerDashboardQuery`, { limit: 10, windowMs: 60 * 1000 })) {
+    throw new Error("Rate limit exceeded. Please try again later.");
+  }
+
   const snapshot = await getLedgerSnapshot(schoolId, { limit: 20 });
 
   const context = {
@@ -249,6 +255,11 @@ export async function processOcrUploadAction(
   schoolId: string,
   imageUrl: string
 ): Promise<{ stagingId: string; extraction: Awaited<ReturnType<typeof processOcrUpload>> }> {
+  const MOCK_ADMIN_ID = "admin-123"; // In a real app, this would come from the auth session
+  if (!rateLimit(`${MOCK_ADMIN_ID}:processOcrUpload`, { limit: 10, windowMs: 60 * 1000 })) {
+    throw new Error("Rate limit exceeded. Please try again later.");
+  }
+
   const extraction = await processOcrUpload(imageUrl);
 
   const staging = await prisma.ocrStaging.create({
@@ -511,6 +522,25 @@ export async function copilotQueryAction(
           feeType: t.feeAssignment.feeType.name,
         }))
       );
+
+      // Build GST rules context from fee types this parent's children have assignments for
+      const feeTypeMap = new Map<string, { name: string; gstTreatment: string; gstRate: number | null }>();
+      parentLink.guardianOf.forEach((g) => {
+        g.student.feeAssignments.forEach((a) => {
+          if (!feeTypeMap.has(a.feeType.id)) {
+            feeTypeMap.set(a.feeType.id, {
+              name: a.feeType.name,
+              gstTreatment: a.feeType.gstTreatment,
+              gstRate: a.feeType.gstRate ? Number(a.feeType.gstRate) : null,
+            });
+          }
+        });
+      });
+      toolContext.gstRules = Array.from(feeTypeMap.values()).map((ft) => ({
+        feeType: ft.name,
+        gstTreatment: ft.gstTreatment,
+        gstRate: ft.gstRate,
+      }));
     }
   }
 
