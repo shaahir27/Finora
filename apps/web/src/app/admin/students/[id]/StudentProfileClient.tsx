@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getStudentProfile, updateStudentStatus } from "@/app/actions/students";
+import { getStudentProfile, updateStudentStatus, updateStudent } from "@/app/actions/students";
 import { useDataState } from "@/lib/useDataState";
 import { FiveStateRenderer } from "@/components/FiveStateRenderer";
 import { GlassCard } from "@/components/GlassCard";
@@ -14,6 +14,9 @@ export function StudentProfileClient({ schoolId, studentId }: { schoolId: string
   const [balanceDisposition, setBalanceDisposition] = useState("");
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState("");
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editData, setEditData] = useState({ name: "", class: "", admissionNumber: "" });
 
   const state = useDataState({
     queryKey: ['studentProfile', schoolId, studentId],
@@ -70,7 +73,10 @@ export function StudentProfileClient({ schoolId, studentId }: { schoolId: string
                 </div>
                 <div className="flex gap-2">
                   <QuickActionButton label="Change Status" onClick={() => setShowStatusModal(true)} />
-                  <QuickActionButton label="Edit Profile" />
+                  <QuickActionButton label="Edit Profile" onClick={() => {
+                    setEditData({ name: data.name, class: data.class, admissionNumber: data.admissionNumber || "" });
+                    setShowEditModal(true);
+                  }} />
                 </div>
               </div>
 
@@ -150,6 +156,53 @@ export function StudentProfileClient({ schoolId, studentId }: { schoolId: string
 
                       <div className="flex justify-end gap-2 pt-4">
                         <QuickActionButton type="button" label="Cancel" onClick={() => setShowStatusModal(false)} />
+                        <QuickActionButton type="submit" label="Save Changes" disabled={updating} className="bg-accent-primary border-none" />
+                      </div>
+                    </form>
+                  </GlassCard>
+                </div>
+              )}
+
+              {/* Edit Profile Modal */}
+              {showEditModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+                  <GlassCard className="w-full max-w-md bg-bg-base">
+                    <h2 className="text-xl font-semibold text-text-primary mb-4">Edit Student Profile</h2>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      setUpdating(true);
+                      setUpdateError("");
+                      try {
+                        await updateStudent(studentId, editData);
+                        setShowEditModal(false);
+                        window.location.reload();
+                      } catch (err: any) {
+                        setUpdateError(err.message || "Failed to edit profile");
+                      } finally {
+                        setUpdating(false);
+                      }
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Full Name</label>
+                        <input required type="text" value={editData.name} onChange={e => setEditData({...editData, name: e.target.value})} className="w-full px-3 py-2 bg-surface-glass border border-border-glass rounded text-text-primary focus:outline-none focus:border-accent-primary-text" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Class</label>
+                        <input required type="text" value={editData.class} onChange={e => setEditData({...editData, class: e.target.value})} className="w-full px-3 py-2 bg-surface-glass border border-border-glass rounded text-text-primary focus:outline-none focus:border-accent-primary-text" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Admission Number</label>
+                        <input type="text" value={editData.admissionNumber} onChange={e => setEditData({...editData, admissionNumber: e.target.value})} className="w-full px-3 py-2 bg-surface-glass border border-border-glass rounded text-text-primary focus:outline-none focus:border-accent-primary-text" />
+                      </div>
+                      
+                      {updateError && (
+                        <div className="text-risk-high text-sm p-2 bg-risk-high/10 rounded border border-risk-high/30">
+                          {updateError}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-2 pt-4">
+                        <QuickActionButton type="button" label="Cancel" onClick={() => setShowEditModal(false)} />
                         <QuickActionButton type="submit" label="Save Changes" disabled={updating} className="bg-accent-primary border-none" />
                       </div>
                     </form>

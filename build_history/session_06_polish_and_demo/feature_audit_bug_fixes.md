@@ -52,15 +52,37 @@ status: "Built"
 * **Root cause:** The layout wrapper used `flex-col md:flex-row`, causing the sidebar to expand and take up the entire viewport on narrower screens or scaled resolutions, completely hiding the actual dashboard content beneath it.
 * **Fix:** Implemented a Mobile Drawer pattern. The sidebar is now hidden by default on mobile/narrow screens. A slim top bar with a Hamburger Menu icon (`Menu` from `lucide-react`) is shown. Clicking it slides the sidebar in (`transform translate-x-0`). Selecting any navigation item correctly dismisses the drawer (`setIsMobileMenuOpen(false)`). On desktop (`>=768px`), the sidebar remains perfectly pinned to the left edge exactly as it was.
 
+### Bug 7 — TypeScript compilation and exactOptionalPropertyTypes errors (HIGH)
+* **Files:** `apps/web/src/app/admin/layout.tsx`, `apps/web/src/app/admin/parents/page.tsx`, `apps/web/tests/session6.test.ts`
+* **Root cause:** Next.js compilation warnings/errors due to strict `exactOptionalPropertyTypes: true` preventing passing `undefined` or optional properties improperly, and mismatching Vitest test mock definitions for `reconciliationStats` & `revenueByChannel`.
+* **Fix:** Conditionally spread `onClick` on Next.js `Link` components. Corrected Parent Creation `email` argument with a conditional spread. Cast test mock to `any` and aligned its object shape with the `getLedgerSnapshot` return schema.
+
+### Bug 8 — Parent Portal Session sessionStorage mismatch (HIGH)
+* **Files:** `apps/web/src/app/parent/dues/page.tsx`, `apps/web/src/app/parent/history/page.tsx`, `apps/web/src/app/parent/copilot/page.tsx`, `apps/web/src/app/parent/settings/page.tsx`
+* **Root cause:** Parent portal subpages read parent user ID from `sessionStorage.getItem("finora_parent_user_id")` which was a legacy pre-NextAuth implementation detail. After NextAuth integration, parent portal pages remained stuck on a loading screen because the user ID was in the NextAuth JWT session instead of sessionStorage.
+* **Fix:** Replaced the legacy `sessionStorage` calls with the `useSession()` hook, resolving the infinite loading spinner and displaying the demo parent's student fee data correctly.
+
+### Bug 9 — Parent Layout Sidebar Mobile Stacking (HIGH)
+* **File:** `apps/web/src/app/parent/layout.tsx`
+* **Root cause:** The parent layout sidebar stacked on top on mobile viewports, hiding content just like Bug 6.
+* **Fix:** Applied the Mobile Drawer pattern with Hamburger Menu and overlay collapse interactions, fully matching the admin panel.
+
+### Bug 10 — Gemini API 404 model errors (CRITICAL)
+* **Files:** `packages/ai/src/copilotQuery.ts`, `packages/ai/src/processOcrUpload.ts`, `packages/ai/src/geminiClient.ts`
+* **Root cause:** The Gemini model name `gemini-1.5-flash` was hardcoded, causing a 404 when using the user's API key.
+* **Fix:** Updated to use `process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite"`, which aligns with the correct model access.
+
 ## 5. Testing & Verification
-* **Automated tests:** Existing tests still pass (no test file changes required — these are logic bug fixes, not new API surface).
+* **Automated tests:** Existing tests still pass. All TypeScript checks pass via `tsc --noEmit`.
 * **Manually verified:**
   * `applyWaiver` on a student with 2 fee assignments → defaulter score reflects correct per-assignment balance, not an underestimated one.
   * `/api/webhooks/razorpay` reachable via HTTP POST; signature mismatch returns 400.
   * `markReminderSent` for parent with no email → `status` stays `logged`, `dispatchError: 'no_email_on_file'` set.
   * `generateReconciliationReport` for a 7-day range → `totalCollected` matches ledger snapshot for the same range.
   * `getDefaulters` called twice → second call updates the existing score row, no new row created.
-  * Simulated laptop zoom and mobile screen widths to verify that the sidebar collapses into a drawer on small screens and pins alongside content on large screens.
+  * Simulated laptop zoom and mobile screen widths to verify that the sidebar collapses into a drawer on small screens and pins alongside content on large screens for both Admin and Parent layouts.
+  * Logged in using `parent@demo.com` and verified parent dues, history, copilot, and settings load real data successfully.
+  * Sent Copilot messages and verified no 404 response errors occur.
 
 ## 6. Dependencies & Deferred Work
 * **Depends on:** All prior sessions' features (this is a cross-cutting audit).

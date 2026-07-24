@@ -37,7 +37,7 @@ export async function generateContent(
     throw new Error("GEMINI_API_KEY is not set. Check Vercel environment variables.");
   }
 
-  const model = options.model ?? "gemini-3.1-flash-lite";
+  const model = options.model ?? process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const body: Record<string, unknown> = { contents };

@@ -62,12 +62,17 @@ export default function RemindersQueuePage() {
   const handleMarkSent = (id: string) => {
     startTransition(async () => {
       try {
-        await markReminderSent(id);
-        setSentIds((prev) => new Set([...prev, id]));
+        const { status, dispatchError } = await markReminderSent(id);
+        if (dispatchError) {
+          alert(`Could not send reminder: ${dispatchError}`);
+        } else {
+          setSentIds((prev) => new Set([...prev, id]));
+        }
+        
         // Optimistically update the status in the list
         setReminders((prev) =>
           prev?.map((r) =>
-            r.id === id ? { ...r, status: "simulated_sent" as const, sentAt: new Date().toISOString() } : r
+            r.id === id ? { ...r, status: status, sentAt: new Date().toISOString(), dispatchError } : r
           ) ?? null
         );
       } catch (err) {
@@ -160,6 +165,8 @@ export default function RemindersQueuePage() {
                   <div className="flex-shrink-0 pt-0.5">
                     {r.isStale && !isSent ? (
                       <span title="Stale — dues already cleared" className="text-lg">⚠️</span>
+                    ) : r.status === "failed" || r.dispatchError ? (
+                      <span title="Failed to send" className="text-lg" style={{ color: "#E06060" }}>❌</span>
                     ) : isSent ? (
                       <span title="Sent" className="text-lg" style={{ color: "#4CAF82" }}>✓</span>
                     ) : (
@@ -192,9 +199,14 @@ export default function RemindersQueuePage() {
                           Stale — dues cleared
                         </span>
                       )}
-                      {isSent && (
+                      {isSent && !r.dispatchError && (
                         <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(76,175,130,0.1)", color: "#4CAF82", border: "1px solid rgba(76,175,130,0.2)" }}>
                           Sent
+                        </span>
+                      )}
+                      {r.dispatchError && (
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(224,96,96,0.1)", color: "#E06060", border: "1px solid rgba(224,96,96,0.2)" }}>
+                          Error: {r.dispatchError}
                         </span>
                       )}
                     </div>

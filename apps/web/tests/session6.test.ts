@@ -98,9 +98,9 @@ describe("Session 6: Polish & Demo", () => {
         transactions: [],
         totalCollected: 0,
         outstandingDuesTotal: 0,
-        reconciliationStats: { posted: 0, flagged: 0, reversed: 0, cheque_pending: 0 },
-        revenueByChannel: {},
-      });
+        reconciliationStats: { matchPercentage: 0, flaggedCount: 0 },
+        revenueByChannel: [] as { channel: string; amount: number }[],
+      } as any);
 
       await generateReconciliationReport(
         "school-1",

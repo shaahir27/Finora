@@ -276,7 +276,7 @@ You have access to your children's fee and payment information.
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
-    const model = "gemini-1.5-flash";
+    const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const body = {
@@ -427,5 +427,23 @@ function detectSuggestion(
       };
     }
   }
+
+  if (toolName === "getMyChildrenDues" && Array.isArray(result)) {
+    const unpaid = (result as Array<{ remainingBalance: number; studentName: string; feeType: string }>).filter(
+      (d) => d.remainingBalance > 0
+    );
+    if (unpaid.length > 0) {
+      const first = unpaid[0];
+      if (first) {
+        return {
+          type: "suggestion",
+          suggestion: "pay_dues",
+          label: `Pay ${first.studentName}'s ${first.feeType} (₹${first.remainingBalance})`,
+          deepLink: "/parent/dues",
+        };
+      }
+    }
+  }
+
   return null;
 }

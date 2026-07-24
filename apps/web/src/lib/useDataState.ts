@@ -5,7 +5,8 @@ export type DataState<T> =
   | { state: "loading" }
   | { state: "synced"; data: T }
   | { state: "stale"; data: T }
-  | { state: "conflict"; data: T };
+  | { state: "conflict"; data: T }
+  | { state: "error"; error: Error };
 
 export type ExtendedQueryOptions<T> = UseQueryOptions<T, Error> & {
   isRealtimeLive?: boolean;
@@ -27,7 +28,7 @@ export function useDataState<T>(options: ExtendedQueryOptions<T>): DataState<T> 
     if (query.data !== undefined) {
       return { state: "stale", data: query.data as T };
     }
-    return { state: "loading" };
+    return { state: "error", error: query.error as Error };
   }
 
   const { data } = query;

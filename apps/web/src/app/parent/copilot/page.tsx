@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { copilotQueryAction } from "@/app/actions/ai";
 import { useTranslations } from "next-intl";
+import { useSession } from "next-auth/react";
 
 interface Message {
   role: "user" | "model";
@@ -17,6 +18,7 @@ interface Suggestion {
 
 export default function ParentCopilotPage() {
   const t = useTranslations("Copilot");
+  const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,13 +42,10 @@ export default function ParentCopilotPage() {
     setLoading(true);
 
     try {
-      const parentUserId = sessionStorage.getItem("finora_parent_user_id");
+      const parentUserId = session?.user?.id;
       if (!parentUserId) throw new Error("Not authenticated");
 
-      // We need the parentLinkId — fetch it via a lightweight server action
-      // For now use parentUserId as the parentLinkId placeholder (copilotQueryAction
-      // accepts parentLinkId which maps via prisma.parentLink.findUnique({ userId }))
-      // We store parent_link_id in sessionStorage after first successful dues fetch
+      // We need the parentLinkId — stored in sessionStorage after dues page loads
       const parentLinkId = sessionStorage.getItem("finora_parent_link_id") || parentUserId;
 
       const history = messages.map((m) => ({ role: m.role, text: m.text }));

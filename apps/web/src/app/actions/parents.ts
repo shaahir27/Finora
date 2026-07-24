@@ -3,6 +3,7 @@
 import { prisma } from "@smart-school/db";
 import { initiateUpiSandboxPayment as _initiateUpiSandboxPayment } from "@smart-school/payments";
 import { calculateAmountPaid, calculateRemainingBalance, calculateWaivedAmount } from "@smart-school/rules";
+import { recordPayment } from "./ledger";
 
 // ---------------------------------------------------------------------------
 // ADMIN PROVISIONING ACTIONS
@@ -209,6 +210,31 @@ export async function payDueViaUpi(feeAssignmentId: string, amount: number) {
 
   const amountPaise = Math.round(amount * 100);
   return _initiateUpiSandboxPayment(feeAssignmentId, amountPaise);
+}
+
+/**
+ * Simulates a successful UPI sandbox payment by recording it directly.
+ */
+export async function simulateSandboxPayment(feeAssignmentId: string, amount: number) {
+  const assignment = await prisma.feeAssignment.findUnique({
+    where: { id: feeAssignmentId },
+    include: { student: true },
+  });
+
+  if (!assignment) {
+    throw new Error("Fee assignment not found");
+  }
+
+  const schoolId = assignment.student.schoolId;
+  const adminId = "sandbox-parent-simulation";
+  const refNumber = "sim_" + Math.random().toString(36).substring(2, 10);
+
+  return recordPayment(adminId, schoolId, {
+    feeAssignmentId,
+    channel: "upi",
+    amount,
+    refNumber,
+  });
 }
 
 /**

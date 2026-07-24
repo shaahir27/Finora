@@ -7,6 +7,7 @@ import { useDataState } from "@/lib/useDataState";
 import { FiveStateRenderer } from "@/components/FiveStateRenderer";
 import { GlassCard } from "@/components/GlassCard";
 import { QuickActionButton } from "@/components/QuickActionButton";
+import { AddStudentModal, ImportCsvModal } from "./StudentModals";
 
 export default function StudentsDirectoryPage() {
   const router = useRouter();
@@ -17,6 +18,16 @@ export default function StudentsDirectoryPage() {
     queryKey: ['students', schoolId, search],
     queryFn: () => getStudents(schoolId, { search, limit: 50 }),
   });
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  const handleSuccess = () => {
+    // Force re-fetch by refreshing the Next.js router cache
+    router.refresh();
+    // Also invalidate the query by changing search briefly won't work - just reload
+    window.location.reload();
+  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -33,10 +44,24 @@ export default function StudentsDirectoryPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <QuickActionButton label="Import CSV" onClick={() => router.push("/admin/settings")} />
-          <QuickActionButton label="Add Student" onClick={() => router.push("/admin/students?action=new")} />
+          <QuickActionButton label="Import CSV" onClick={() => setShowImportModal(true)} />
+          <QuickActionButton label="Add Student" onClick={() => setShowAddModal(true)} />
         </div>
       </div>
+
+      <AddStudentModal 
+        isOpen={showAddModal} 
+        onClose={() => setShowAddModal(false)} 
+        schoolId={schoolId} 
+        onSuccess={handleSuccess} 
+      />
+      
+      <ImportCsvModal 
+        isOpen={showImportModal} 
+        onClose={() => setShowImportModal(false)} 
+        schoolId={schoolId} 
+        onSuccess={handleSuccess} 
+      />
 
       <FiveStateRenderer state={state}>
         {(data) => {

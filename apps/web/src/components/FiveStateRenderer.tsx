@@ -15,6 +15,15 @@ export function FiveStateRenderer<T>({ state, children }: FiveStateRendererProps
     );
   }
 
+  if (state.state === "error") {
+    return (
+      <div className="w-full h-32 flex flex-col items-center justify-center text-risk-high bg-risk-high/10 border border-risk-high/30 rounded-md p-4">
+        <span className="font-bold mb-2">Failed to load data</span>
+        <span className="text-sm opacity-80">{state.error?.message || "An unexpected error occurred."}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full">
       {/* If stale, show a subtle banner or indicator at the top, but still render the data */}

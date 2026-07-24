@@ -78,22 +78,15 @@ const PARENT_EXCERPTS: Record<string, string> = {
 export async function answerHowDoI(role: Role, topic: string): Promise<string> {
   const excerpts = role === "admin" ? ADMIN_EXCERPTS : PARENT_EXCERPTS;
 
-  // Find relevant excerpts by keyword matching (simple, deterministic — no AI in the retrieval step)
-  const topicLower = topic.toLowerCase();
-  const relevant = Object.entries(excerpts)
-    .filter(([key]) => topicLower.includes(key) || key.split(" ").some((w) => topicLower.includes(w)))
-    .map(([, value]) => value);
-
-  if (relevant.length === 0) {
-    return `I don't have specific guidance on "${topic}" in my knowledge base. Please check with your school's finance office or refer to the help documentation.`;
-  }
-
-  const excerptText = relevant.join("\n\n");
+  // Render the entire list of excerpts as reference context for Gemini semantic mapping
+  const excerptText = Object.entries(excerpts)
+    .map(([key, val]) => `[Topic: ${key}]\n${val}`)
+    .join("\n\n");
 
   try {
     const prompt = `You are a helpful assistant for a school fee management system. 
-Answer the user's question using ONLY the guidance excerpts provided below.
-Do not add information from general knowledge. If the excerpts don't fully answer the question, say so.
+Answer the user's question using ONLY the guidance excerpts provided below. Match the user's question semantically (e.g. mapping synonyms like "bounced check" or "re-open dues" to "mark cheque bounced", "adjust fees" or "scholarship" to "apply waiver") to the appropriate excerpts.
+Do not add information from general knowledge. If the excerpts don't contain the answer to the user's question, say: "I don't have specific guidance on this topic in my knowledge base. Please check with your school's finance office."
 
 User question: "${topic}"
 User role: ${role}
@@ -108,8 +101,13 @@ Provide a clear, concise answer in 2-4 sentences.`;
       { temperature: 0.2 }
     );
     return text.trim();
-  } catch {
-    // Fallback: return the raw excerpt directly
-    return relevant[0] ?? "I don't have information on that topic.";
+  } catch (error) {
+    console.error("Gemini grounding error:", error);
+    // Fallback: search by simple keyword contains mapping
+    const topicLower = topic.toLowerCase();
+    const fallbackRelevant = Object.entries(excerpts)
+      .filter(([key]) => topicLower.includes(key) || key.split(" ").some((w) => topicLower.includes(w)))
+      .map(([, value]) => value);
+    return fallbackRelevant[0] ?? "I don't have specific guidance on this topic in my knowledge base. Please check with your school's finance office.";
   }
 }

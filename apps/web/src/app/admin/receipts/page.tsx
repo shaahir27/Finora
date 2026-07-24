@@ -38,7 +38,7 @@ export default function AdminReceiptsPage() {
   const handleGenerate = async (txId: string, format: "a4" | "thermal") => {
     try {
       const res = await generateReceipt(txId, format);
-      alert(`Receipt generated: ${res.receiptNumber}\nPDF: ${res.pdfUrl}`);
+      window.open(res.pdfUrl, "_blank");
     } catch (e: any) {
       alert(`Error: ${e.message}`);
     }

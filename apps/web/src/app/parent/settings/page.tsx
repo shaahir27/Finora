@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { subscribeToPush, unsubscribeFromPush } from "@/app/actions/push";
 import { useTranslations } from "next-intl";
+import { useSession } from "next-auth/react";
 
 const urlBase64ToUint8Array = (base64String: string) => {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -18,6 +19,7 @@ const urlBase64ToUint8Array = (base64String: string) => {
 
 export default function ParentSettingsPage() {
   const t = useTranslations("Settings");
+  const { data: session } = useSession();
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function ParentSettingsPage() {
       if (isSubscribed) {
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
-          const parentUserId = sessionStorage.getItem("finora_parent_user_id");
+          const parentUserId = session?.user?.id;
           if (parentUserId) {
             await unsubscribeFromPush(parentUserId, subscription.endpoint);
           }
@@ -70,7 +72,7 @@ export default function ParentSettingsPage() {
 
         const subJson = subscription.toJSON();
         
-        const parentUserId = sessionStorage.getItem("finora_parent_user_id");
+        const parentUserId = session?.user?.id;
         if (parentUserId) {
           await subscribeToPush(parentUserId, {
             endpoint: subscription.endpoint,

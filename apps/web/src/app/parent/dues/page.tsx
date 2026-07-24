@@ -5,17 +5,23 @@ import { GlassCard } from "@/components/GlassCard";
 import { getMyChildrenDues, getParentLinkId, getParentSchoolId } from "@/app/actions/parents";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export default function ParentDuesPage() {
   const t = useTranslations("Dues");
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [loading, setLoading] = useState(true);
   const [dues, setDues] = useState<any[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   useEffect(() => {
-    const parentUserId = sessionStorage.getItem("finora_parent_user_id");
-    if (!parentUserId) return;
+    if (status === "loading") return;
+    const parentUserId = session?.user?.id;
+    if (!parentUserId) {
+      setLoading(false);
+      return;
+    }
 
     // Cache parentLinkId and schoolId for copilot
     if (!sessionStorage.getItem("finora_parent_link_id")) {
@@ -33,13 +39,13 @@ export default function ParentDuesPage() {
       .then((data) => {
         setDues(data);
         if (data.length > 0) {
-          // Default to first student found
-          setSelectedStudentId(data[0].studentId);
+          const first = data[0];
+          if (first) setSelectedStudentId(first.studentId);
         }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [status, session]);
 
   const students = useMemo(() => {
     const map = new Map<string, string>();
@@ -52,7 +58,7 @@ export default function ParentDuesPage() {
     return dues.filter(d => d.studentId === selectedStudentId);
   }, [dues, selectedStudentId]);
 
-  if (loading) {
+  if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(76,175,130,0.4)", borderTopColor: "transparent" }} />

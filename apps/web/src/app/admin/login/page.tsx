@@ -15,6 +15,7 @@
 import { useState, useId } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signIn } from "next-auth/react";
 
 const DEMO_EMAIL = "admin@school.edu";
 const DEMO_PASSWORD = "demo1234";
@@ -37,15 +38,17 @@ export default function AdminLoginPage() {
     // Simulate a brief network delay for realism
     await new Promise((r) => setTimeout(r, 600));
 
-    if (
-      email.trim().toLowerCase() === DEMO_EMAIL &&
-      password === DEMO_PASSWORD
-    ) {
-      sessionStorage.setItem(SESSION_KEY, "1");
-      router.replace("/admin/dashboard");
-    } else {
+    const result = await signIn("admin-login", {
+      email: email.trim().toLowerCase(),
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
       setError("Invalid email or password. Try admin@school.edu / demo1234");
       setIsLoading(false);
+    } else {
+      router.replace("/admin/dashboard");
     }
   };
 

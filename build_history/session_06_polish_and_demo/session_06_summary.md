@@ -28,6 +28,11 @@
 3. **`markReminderSent` no-email path** — set `status: 'failed'` instead of `status: 'logged'` for missing-email no-op. Fixed per `api_specification.md`.
 4. **`generateReconciliationReport` date filter** — snapshot fetched without dates; fixed to pass date params to `getLedgerSnapshot` for period-scoped aggregate metrics.
 5. **`getDefaulters` unbounded DB growth** — `create()` called on every page load per defaulter student. Replaced with upsert-by-today pattern.
+6. **`AdminLayout` and `ParentLayout` Responsive Sidebar Breakage** — sidebar elements blocked mobile rendering. Replaced with Hamburger menu drawer panels.
+7. **TypeScript strict typings & exactOptionalPropertyTypes** — compilation fails due to Next.js strict flags. Conditionally spread `onClick` on Link elements.
+8. **Parent Portal Session sessionStorage mismatch** — subpages tried to fetch user ID from `sessionStorage`. Updated to `useSession()` to support NextAuth JWT sessions.
+9. **Gemini API 404 model errors** — `gemini-1.5-flash` was hardcoded. Set model configuration to dynamically fall back to the operational `gemini-3.5-flash-lite`.
+10. **Reconciliation Report null-pointer** — empty query results caused `reduce()` to crash on undefined ledger records. Added optional chaining and safe default return.
 
 ## Known deferred items (carried to post-demo)
 

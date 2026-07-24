@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GlassCard } from "@/components/GlassCard";
 import { supabase } from "@/lib/supabase-client";
+import { signIn } from "next-auth/react";
 
 export default function ParentLoginPage() {
   const router = useRouter();
@@ -32,6 +33,14 @@ export default function ParentLoginPage() {
     setError(null);
 
     try {
+      // DEMO BYPASS: skip Supabase OTP for the demo parent account
+      const identifier = method === "phone" ? phone : email;
+      if (identifier === "parent@demo.com" || identifier === "+919999999999") {
+        setOtpSent(true);
+        setResendCooldown(60);
+        setLoading(false);
+        return;
+      }
       if (method === "phone") {
         if (!phone.startsWith("+")) {
           throw new Error("Please include the country code, e.g. +91");
@@ -83,26 +92,19 @@ export default function ParentLoginPage() {
     setError(null);
 
     try {
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        phone: method === "phone" ? phone : undefined,
-        email: method === "email" ? email : undefined,
-        token: otp,
+      const result = await signIn("parent-otp", {
+        phone: method === "phone" ? phone : "",
+        email: method === "email" ? email : "",
+        otp,
         type: method === "phone" ? "sms" : "email",
+        redirect: false,
       });
 
-      if (verifyError) {
-        if (verifyError.message.toLowerCase().includes("expired")) {
-           throw new Error("OTP has expired. Please request a new one.");
-        }
+      if (result?.error) {
         throw new Error("Invalid OTP code. Please try again.");
       }
 
-      // Check role mapping if we have an API for it, or just rely on layout guard
-      if (data.user) {
-        sessionStorage.setItem("finora_parent_authed", "1");
-        sessionStorage.setItem("finora_parent_user_id", data.user.id);
-        router.push("/parent/dues");
-      }
+      router.push("/parent/dues");
     } catch (err: any) {
       setError(err.message || "Failed to verify OTP.");
     } finally {

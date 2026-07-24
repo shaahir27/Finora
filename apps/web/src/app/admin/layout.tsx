@@ -11,17 +11,17 @@ import {
   Users, UserCheck, FileBarChart, UploadCloud, WifiOff, SettingsIcon,
   Menu, X
 } from "lucide-react";
+import { signOut, useSession, SessionProvider } from "next-auth/react";
 
-const SESSION_KEY = "finora_admin_authed";
 const PUBLIC_PATHS = ["/admin/login"];
 
-function NavItem({ href, icon: Icon, children, onClick }: { href: string, icon: any, children: ReactNode, onClick?: () => void }) {
+function NavItem({ href, icon: Icon, children, onClick }: { href: string; icon: any; children: ReactNode; onClick?: () => void }) {
   const pathname = usePathname();
   const isActive = pathname.startsWith(href);
   return (
     <Link 
       href={href} 
-      onClick={onClick}
+      {...(onClick ? { onClick: () => onClick() } : {})}
       className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
         isActive 
           ? "bg-[#4CAF82]/10 text-[#4CAF82] shadow-[inset_2px_0_0_#4CAF82]" 
@@ -46,38 +46,37 @@ function NavGroup({ title, children }: { title: string, children: ReactNode }) {
 }
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </SessionProvider>
+  );
+}
+
+function AdminLayoutInner({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [authChecked, setAuthChecked] = useState(false);
+  const { data: session, status } = useSession();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const closeMenu = () => setIsMobileMenuOpen(false);
-
-  useEffect(() => {
-    const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-    if (isPublic) {
-      setAuthChecked(true);
-      return;
-    }
-    const authed = sessionStorage.getItem(SESSION_KEY) === "1";
-    if (!authed) {
-      router.replace("/admin/login");
-    } else {
-      setAuthChecked(true);
-    }
-  }, [pathname, router]);
 
   // On login page, render children directly (no shell)
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return <>{children}</>;
   }
 
-  // Auth check pending — show nothing to avoid flash
-  if (!authChecked) {
+  // Auth check pending
+  if (status === "loading") {
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(76,175,130,0.4)", borderTopColor: "transparent" }} />
       </div>
     );
+  }
+
+  // If not authenticated and not on public path, middleware should have caught it, but just in case
+  if (status === "unauthenticated") {
+    return null;
   }
 
   return (
@@ -145,11 +144,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
           <div className="p-4 border-t border-border-glass mt-auto bg-white/5">
             <p className="text-[10px] text-text-secondary uppercase tracking-wider">Logged in as</p>
-            <p className="text-sm font-medium text-text-primary truncate mt-0.5">admin@school.edu</p>
+            <p className="text-sm font-medium text-text-primary truncate mt-0.5">{session?.user?.email || "admin@school.edu"}</p>
             <button
               id="admin-logout-btn"
               type="button"
-              onClick={() => { sessionStorage.removeItem(SESSION_KEY); router.replace("/admin/login"); }}
+              onClick={() => signOut({ callbackUrl: "/admin/login" })}
               className="mt-3 text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
             >
               Sign out

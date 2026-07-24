@@ -34,6 +34,7 @@ export interface ReminderQueueItem {
   status: ReminderStatus;
   createdAt: string;
   sentAt: string | null;
+  dispatchError: string | null;
   /** True if the balance has been cleared since the reminder was drafted — stale reminder */
   isStale: boolean;
 }
@@ -100,6 +101,7 @@ export async function getRemindersQueue(
       status: log.status,
       createdAt: log.createdAt.toISOString(),
       sentAt: log.sentAt?.toISOString() ?? null,
+      dispatchError: log.dispatchError,
       isStale,
     };
   });
@@ -117,7 +119,7 @@ const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_key");
  * WhatsApp/SMS: changes status to simulated_sent (no real delivery — Governing Principle 3).
  * Email: Sends via Resend if parent email exists.
  */
-export async function markReminderSent(reminderLogId: string): Promise<void> {
+export async function markReminderSent(reminderLogId: string): Promise<{ status: ReminderStatus; dispatchError: string | null }> {
   const log = await prisma.reminderLog.findUnique({
     where: { id: reminderLogId },
     include: {
@@ -155,15 +157,16 @@ export async function markReminderSent(reminderLogId: string): Promise<void> {
     if (!parentEmail) {
       // api_specification.md: "If no email is on file, the action still succeeds as a no-op dispatch
       // and the UI must surface 'no email on file' rather than silently doing nothing."
-      // Keep status as 'logged' (action succeeded, nothing was sent), but write dispatchError so
+      // Keep status as 'failed', but write dispatchError so
       // the UI can surface the "no email on file" message rather than treating it as a failure.
       await prisma.reminderLog.update({
         where: { id: reminderLogId },
         data: {
-          dispatchError: "no_email_on_file",
+          status: "failed",
+          dispatchError: "no email on file",
         },
       });
-      return;
+      return { status: "failed", dispatchError: "no email on file" };
     }
 
     try {
@@ -181,15 +184,18 @@ export async function markReminderSent(reminderLogId: string): Promise<void> {
           sentAt: new Date(),
         },
       });
+      return { status: "sent", dispatchError: null };
     } catch (err: any) {
+      const errorMsg = err.message || "Unknown email dispatch error";
       await prisma.reminderLog.update({
         where: { id: reminderLogId },
         data: {
           status: "failed",
-          dispatchError: err.message || "Unknown email dispatch error",
+          dispatchError: errorMsg,
           sentAt: new Date(),
         },
       });
+      return { status: "failed", dispatchError: errorMsg };
     }
   } else {
     // WhatsApp/SMS
@@ -200,5 +206,6 @@ export async function markReminderSent(reminderLogId: string): Promise<void> {
         sentAt: new Date(),
       },
     });
+    return { status: "simulated_sent", dispatchError: null };
   }
 }

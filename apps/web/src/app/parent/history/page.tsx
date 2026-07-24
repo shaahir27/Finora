@@ -4,27 +4,30 @@ import { useEffect, useState, useMemo } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { getMyPaymentHistory, getMyChildrenDues } from "@/app/actions/parents";
 import { useTranslations } from "next-intl";
+import { useSession } from "next-auth/react";
 
 export default function ParentHistoryPage() {
   const t = useTranslations("History");
+  const { data: session, status } = useSession();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
   
-  // We fetch dues just to get the list of active students and their names
   const [students, setStudents] = useState<{id: string, name: string}[]>([]);
   const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
 
   useEffect(() => {
-    const parentUserId = sessionStorage.getItem("finora_parent_user_id");
-    if (!parentUserId) return;
+    if (status === "loading") return;
+    const parentUserId = session?.user?.id;
+    if (!parentUserId) {
+      setLoading(false);
+      return;
+    }
 
     Promise.all([
       getMyChildrenDues(parentUserId),
       getMyPaymentHistory(parentUserId)
     ])
     .then(([duesData, historyData]) => {
-      // Build unique list of students from dues (since history only has names)
-      // For a real robust implementation, we might have a getMyStudents action
       const map = new Map<string, string>();
       duesData.forEach(d => map.set(d.studentId, d.studentName));
       const studs = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
@@ -33,15 +36,16 @@ export default function ParentHistoryPage() {
       setTransactions(historyData.transactions);
       
       if (studs.length > 0) {
-        setSelectedStudentName(studs[0].name);
+        const first = studs[0];
+        if (first) setSelectedStudentName(first.name);
       } else if (historyData.transactions.length > 0) {
-        // Fallback if they have history but no active dues/students
-        setSelectedStudentName(historyData.transactions[0].studentName);
+        const firstTx = historyData.transactions[0];
+        if (firstTx) setSelectedStudentName(firstTx.studentName);
       }
     })
     .catch(console.error)
     .finally(() => setLoading(false));
-  }, []);
+  }, [status, session]);
 
   const displayedTransactions = useMemo(() => {
     if (!selectedStudentName) return [];
@@ -58,7 +62,7 @@ export default function ParentHistoryPage() {
     }
   };
 
-  if (loading) {
+  if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(76,175,130,0.4)", borderTopColor: "transparent" }} />

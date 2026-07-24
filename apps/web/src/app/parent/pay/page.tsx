@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GlassCard } from "@/components/GlassCard";
-import { payDueViaUpi } from "@/app/actions/parents";
+import { payDueViaUpi, simulateSandboxPayment } from "@/app/actions/parents";
 import { useTranslations } from "next-intl";
 
 function PayForm() {
@@ -46,17 +46,18 @@ function PayForm() {
   };
 
   const handleSimulatePayment = async () => {
-    // In a real app, this would open Razorpay Checkout.
-    // For this sandbox, we simulate the webhook directly or show a success screen.
-    // Since we need to test the webhook, the actual webhook flow happens server-to-server.
-    // For the UI, we just simulate success after a delay.
+    // We now use a real backend call to simulate the webhook
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await simulateSandboxPayment(assignmentId!, parseFloat(amount));
       setSuccess(true);
       // Wait a moment then go back to dues
       setTimeout(() => router.push("/parent/dues"), 3000);
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || "Failed to simulate payment");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!assignmentId || !initialAmount) return null;

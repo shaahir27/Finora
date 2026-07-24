@@ -49,7 +49,7 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
   });
 
   const handleExport = () => {
-    if (state.status === "success" && state.data) {
+    if (state.state === "synced" || state.state === "stale" || state.state === "conflict") {
       const csvData = [
         ["Metric", "Value"],
         ["Collected Today", state.data.totalCollected],

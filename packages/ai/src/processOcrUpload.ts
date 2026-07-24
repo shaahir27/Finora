@@ -57,7 +57,7 @@ If a field is not visible or ambiguous, use null. Do NOT guess amounts from cont
   }
 
   // Use the multimodal endpoint with an inline image URL
-  const model = "gemini-1.5-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const body = {

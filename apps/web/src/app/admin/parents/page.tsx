@@ -42,7 +42,7 @@ export default function AddParentPage() {
       await createParentAccount(schoolId, {
         name,
         phone,
-        email: email || undefined,
+        ...(email ? { email } : {}),
         studentIds: selectedStudentIds,
       });
 
