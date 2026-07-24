@@ -45,7 +45,7 @@ export default function RemindersQueuePage() {
     setIsLoading(true);
     const s = status ?? filter;
     const statusParam = s === "all" ? undefined : s;
-    getRemindersQueue(SCHOOL_ID, { status: statusParam as "logged" | "simulated_sent" | undefined, limit: 100 })
+    getRemindersQueue(SCHOOL_ID, { ...(statusParam ? { status: statusParam as "logged" | "simulated_sent" } : {}), limit: 100 })
       .then(({ reminders: r }) => setReminders(r))
       .catch(() => setReminders([]))
       .finally(() => setIsLoading(false));

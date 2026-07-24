@@ -20,7 +20,7 @@ export function ChannelBarChart({ data }: ChannelBarChartProps) {
               cursor={{ fill: "var(--color-border-glass)" }}
               contentStyle={{ backgroundColor: "var(--color-bg-base)", border: "1px solid var(--color-border-glass)", borderRadius: "8px", color: "var(--color-text-primary)" }}
               itemStyle={{ color: "var(--color-accent-primary-text)" }}
-              formatter={(value: number) => [`₹${value}`, "Amount"]}
+              formatter={(value: any) => [`₹${value}`, "Amount"]}
             />
             <Bar dataKey="amount" fill="var(--color-accent-primary-text)" radius={[4, 4, 0, 0]} />
           </BarChart>

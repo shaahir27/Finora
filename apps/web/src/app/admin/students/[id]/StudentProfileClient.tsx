@@ -6,7 +6,7 @@ import { useDataState } from "@/lib/useDataState";
 import { FiveStateRenderer } from "@/components/FiveStateRenderer";
 import { GlassCard } from "@/components/GlassCard";
 import { QuickActionButton } from "@/components/QuickActionButton";
-import { StatusBadge } from "@/components/StatusBadge"; // wait, I called it ReconciliationStatusBadge & PaymentStatusBadge in StatusBadge.tsx
+
 
 export function StudentProfileClient({ schoolId, studentId }: { schoolId: string, studentId: string }) {
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -52,7 +52,7 @@ export function StudentProfileClient({ schoolId, studentId }: { schoolId: string
               if (tx.reconciliationStatus === "posted") pd += tx.amount.toNumber();
             }
             for (const w of a.waivers) wv += w.amount.toNumber();
-            const bal = a.feeType.amount.toNumber() - pd - wv;
+            const bal = a.amount.toNumber() - pd - wv;
             totalBalance += bal > 0 ? bal : 0;
           }
 
@@ -95,7 +95,7 @@ export function StudentProfileClient({ schoolId, studentId }: { schoolId: string
                         <p className="text-sm text-text-secondary">Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-text-primary">₹{assignment.feeType.amount.toString()}</p>
+                        <p className="font-medium text-text-primary">₹{assignment.amount.toString()}</p>
                       </div>
                     </div>
                   </GlassCard>

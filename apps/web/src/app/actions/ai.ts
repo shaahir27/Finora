@@ -294,7 +294,7 @@ export async function confirmOcrEntryAction(
     feeAssignmentId: correctedFields.feeAssignmentId,
     channel: correctedFields.channel,
     amount: correctedFields.amount,
-    refNumber: correctedFields.refNumber,
+    ...(correctedFields.refNumber !== undefined ? { refNumber: correctedFields.refNumber } : {}),
   });
 
   // Flip confirmed = true and link to the transaction that was created
@@ -428,7 +428,7 @@ export async function copilotQueryAction(
 
   const toolContext: CopilotToolContext = {
     role,
-    schoolName: school?.name,
+    ...(school?.name ? { schoolName: school.name } : {}),
   };
 
   if (role === "admin") {

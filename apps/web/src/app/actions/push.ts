@@ -33,7 +33,7 @@ export async function subscribeToPush(
       data: {
         p256dhKey: subscription.keys.p256dh,
         authKey: subscription.keys.auth,
-        deviceLabel: deviceLabel || existing.deviceLabel,
+        ...(deviceLabel !== undefined ? { deviceLabel } : {}),
       },
     });
   }
@@ -44,7 +44,7 @@ export async function subscribeToPush(
       endpoint: subscription.endpoint,
       p256dhKey: subscription.keys.p256dh,
       authKey: subscription.keys.auth,
-      deviceLabel,
+      ...(deviceLabel !== undefined ? { deviceLabel } : {}),
     },
   });
 }

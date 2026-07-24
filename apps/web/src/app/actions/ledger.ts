@@ -37,7 +37,7 @@ export async function recordPayment(
     throw new Error("Payment amount must be greater than zero.");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // 1. Acquire row-level lock on the FEE_ASSIGNMENT
     const feeAssignments = await tx.$queryRaw<
       { id: string; amount: number }[]
@@ -187,7 +187,7 @@ export async function recordPayment(
       body: `A payment of ₹${result.transaction.amount} was recorded.`,
       url: `/admin/students/${result.transaction.studentId}`,
     }).catch(console.error);
-  } else if (result.anomalyResult.isAnomalous) {
+  } else if (result.anomalyResult?.isAnomalous) {
     notifySchoolAdmins(schoolId, {
       title: "Anomaly Flagged",
       body: `A payment was flagged for manual review: ${result.anomalyResult.reason}`,
@@ -277,7 +277,7 @@ export async function markChequeBounced(
     throw new Error("A reason is required to mark a cheque as bounced.");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const transaction = await tx.transaction.findUnique({
       where: { id: transactionId },
       include: {

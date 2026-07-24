@@ -73,7 +73,7 @@ export default function OcrUploadPage() {
           feeAssignmentId,
           amount: Number(amount),
           channel,
-          refNumber: refNumber || undefined,
+          ...(refNumber ? { refNumber } : {}),
         });
         setStage({ type: "confirmed", transactionId: result.transaction.id });
       } catch (err) {
@@ -150,19 +150,21 @@ export default function OcrUploadPage() {
               className="ml-auto text-xs px-2 py-0.5 rounded-full"
               style={{
                 background:
-                  stage.type === "staged" &&
-                  (stage.extraction.confidence === "high"
-                    ? "rgba(76,175,130,0.15)"
-                    : stage.extraction.confidence === "medium"
-                    ? "rgba(255,200,100,0.15)"
-                    : "rgba(200,100,100,0.15)"),
+                  stage.type === "staged"
+                    ? (stage.extraction.confidence === "high"
+                      ? "rgba(76,175,130,0.15)"
+                      : stage.extraction.confidence === "medium"
+                      ? "rgba(255,200,100,0.15)"
+                      : "rgba(200,100,100,0.15)")
+                    : undefined,
                 color:
-                  stage.type === "staged" &&
-                  (stage.extraction.confidence === "high"
-                    ? "#4CAF82"
-                    : stage.extraction.confidence === "medium"
-                    ? "#FFC864"
-                    : "#E06060"),
+                  stage.type === "staged"
+                    ? (stage.extraction.confidence === "high"
+                      ? "#4CAF82"
+                      : stage.extraction.confidence === "medium"
+                      ? "#FFC864"
+                      : "#E06060")
+                    : undefined,
               }}
             >
               {stage.type === "staged" ? `${stage.extraction.confidence} confidence` : ""}

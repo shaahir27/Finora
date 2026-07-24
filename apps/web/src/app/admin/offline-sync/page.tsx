@@ -138,7 +138,7 @@ export default function OfflineSyncQueuePage() {
                 <div>
                   <div className="flex items-center gap-3">
                     <span className="font-semibold text-text-primary uppercase">{conflict.channel}</span>
-                    <span className="text-text-primary font-medium">₹{conflict.amount}</span>
+                    <span className="text-text-primary font-medium">₹{conflict.amount.toString()}</span>
                     <OfflineSyncStatusBadge status="conflict" />
                   </div>
                   <p className="text-sm text-risk-high font-medium mt-1">
