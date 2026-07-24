@@ -17,18 +17,22 @@ export async function generateReconciliationReport(
     throw new Error("Rate limit exceeded. Please try again later.");
   }
 
-  // Get the same snapshot used by the dashboard to ensure figure parity
-  const snapshot = await getLedgerSnapshot(schoolId, { limit: 10000 }); // Unbounded for report in demo
-
-  // Filter snapshot to the requested date range
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
   const end = new Date(endDate);
   end.setHours(23, 59, 59, 999);
 
-  const rangeTransactions = snapshot.transactions.filter(
-    (t) => t.postedAt >= start && t.postedAt <= end
-  );
+  // Pass date range into getLedgerSnapshot so aggregate metrics (totalCollected,
+  // outstandingDuesTotal) reflect the report period — not school-wide totals.
+  // Fix: previously dates were not passed and the snapshot was filtered in-memory AFTER fetching,
+  // meaning the header metrics always showed school-wide figures regardless of date range.
+  const snapshot = await getLedgerSnapshot(schoolId, {
+    startDate: start,
+    endDate: end,
+    limit: 10000, // unbounded for demo report export
+  });
+
+  const rangeTransactions = snapshot.transactions;
 
   // In a real app, we'd generate a CSV or PDF buffer here and upload to Supabase Storage.
   // For the demo, we'll stub the URL but we MUST generate the AUDIT_LOG row.
@@ -48,3 +52,4 @@ export async function generateReconciliationReport(
 
   return { url, count: rangeTransactions.length };
 }
+

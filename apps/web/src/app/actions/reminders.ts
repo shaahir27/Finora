@@ -153,16 +153,14 @@ export async function markReminderSent(reminderLogId: string): Promise<void> {
     const parentEmail = guardians.find((g) => g.parentLink.user.email)?.parentLink.user.email;
 
     if (!parentEmail) {
-      // Missing email — action succeeds as no-op per api_specification.md, but is distinct
-      // Wait, api_specification.md: "If no email is on file, the action still succeeds as a no-op dispatch and the UI must surface 'no email on file'"
-      // To surface "no email on file" in the UI without a dedicated status, we can set it to failed with dispatchError
-      // Let's set dispatchError for this special case
+      // api_specification.md: "If no email is on file, the action still succeeds as a no-op dispatch
+      // and the UI must surface 'no email on file' rather than silently doing nothing."
+      // Keep status as 'logged' (action succeeded, nothing was sent), but write dispatchError so
+      // the UI can surface the "no email on file" message rather than treating it as a failure.
       await prisma.reminderLog.update({
         where: { id: reminderLogId },
         data: {
-          status: "failed",
-          dispatchError: "no email on file",
-          sentAt: new Date(),
+          dispatchError: "no_email_on_file",
         },
       });
       return;

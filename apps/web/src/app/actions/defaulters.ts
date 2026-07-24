@@ -71,15 +71,38 @@ export async function getDefaulters(schoolId: string) {
         admissionNumber: student.admissionNumber
       });
 
-      // Update or create in DB
-      await prisma.defaulterScore.create({
-        data: {
+      // Upsert: update today's score if it already exists, otherwise create.
+      // Fix: previously create() was called on every getDefaulters() invocation, inserting
+      // duplicate rows on every page load and growing the table unboundedly.
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const existingToday = await prisma.defaulterScore.findFirst({
+        where: {
           studentId: student.id,
-          schoolId,
-          riskLevel: riskLevelInt,
-          computedReason: score.reason
-        }
+          computedAt: { gte: todayStart },
+        },
+        orderBy: { computedAt: "desc" },
       });
+
+      if (existingToday) {
+        await prisma.defaulterScore.update({
+          where: { id: existingToday.id },
+          data: {
+            riskLevel: riskLevelInt,
+            computedReason: score.reason,
+          },
+        });
+      } else {
+        await prisma.defaulterScore.create({
+          data: {
+            studentId: student.id,
+            schoolId,
+            riskLevel: riskLevelInt,
+            computedReason: score.reason,
+          },
+        });
+      }
     }
   }
 
@@ -90,4 +113,95 @@ export async function getDefaulters(schoolId: string) {
   });
 
   return scoresToUpsert;
+}
+
+export async function queueRemindersForStudent(schoolId: string, studentId: string) {
+  const assignments = await prisma.feeAssignment.findMany({
+    where: { studentId, dueDate: { lt: new Date() } },
+    include: {
+      student: { select: { schoolId: true } },
+      transactions: true,
+      waivers: true,
+    }
+  });
+
+  const studentAssignments = assignments.filter(a => a.student.schoolId === schoolId);
+  let queuedCount = 0;
+
+  for (const fa of studentAssignments) {
+    const paid = calculateAmountPaid(fa.transactions);
+    const waived = calculateWaivedAmount(fa.waivers);
+    const remainingBalance = calculateRemainingBalance(fa.amount.toNumber(), paid, waived);
+
+    if (remainingBalance > 0) {
+      const existing = await prisma.reminderLog.findFirst({
+        where: { feeAssignmentId: fa.id, tier: 1 }
+      });
+      
+      if (!existing) {
+        await prisma.reminderLog.create({
+          data: {
+            feeAssignmentId: fa.id,
+            tier: 1,
+            channel: "email",
+            draftedText: `This is an automated reminder regarding your overdue payment of ₹${remainingBalance}.`,
+            status: "logged",
+          }
+        });
+        queuedCount++;
+      }
+    }
+  }
+
+  return { success: true, queuedCount };
+}
+
+export async function escalateDefaulterScore(schoolId: string, studentId: string) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const existingToday = await prisma.defaulterScore.findFirst({
+    where: {
+      studentId,
+      schoolId,
+      computedAt: { gte: todayStart },
+    },
+    orderBy: { computedAt: "desc" },
+  });
+
+  if (existingToday) {
+    await prisma.defaulterScore.update({
+      where: { id: existingToday.id },
+      data: {
+        riskLevel: 3,
+        computedReason: "Manual escalation by admin",
+      },
+    });
+  } else {
+    await prisma.defaulterScore.create({
+      data: {
+        studentId,
+        schoolId,
+        riskLevel: 3,
+        computedReason: "Manual escalation by admin",
+      },
+    });
+  }
+
+  const admin = await prisma.user.findFirst({
+    where: { schoolId, role: "admin" }
+  });
+
+  if (admin) {
+    await prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "manual_escalation",
+        beforeState: existingToday ? { riskLevel: existingToday.riskLevel } : {},
+        afterState: { riskLevel: 3 },
+      }
+    });
+  }
+
+  return { success: true };
 }

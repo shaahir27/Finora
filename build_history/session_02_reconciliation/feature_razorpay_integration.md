@@ -29,13 +29,14 @@ status: "Built"
   ): Promise<RazorpayOrder>
   // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
-  * `handleRazorpayWebhook` (`apps/web/src/app/actions/payments.ts`): Processes an incoming Razorpay webhook. Verifies HMAC-SHA256 signature and calls recordPayment.
+  * `handleRazorpayWebhook` (`apps/web/src/app/actions/payments.ts`): Server Action wrapper — verifies HMAC-SHA256 and calls `recordPayment`. Used internally by the API route below.
   ```typescript
   export async function handleRazorpayWebhook(
     rawBody: string, signature: string, adminId: string, schoolId: string, feeAssignmentId: string
   ): Promise<{ success: boolean; isDuplicate?: boolean }>
   // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
+  * `POST /api/webhooks/razorpay` (`apps/web/src/app/api/webhooks/razorpay/route.ts`): **Added 2026-07-24 (audit session).** The actual HTTP entry point for Razorpay's async callbacks. Reads raw body before JSON.parse (required for signature verification), calls `verifyRazorpayWebhookSignature`, extracts `fee_assignment_id` from order notes, and calls `recordPayment`. Returns 400 on signature failure, 200 (no-op) for non-captured events, 500 on DB failure so Razorpay retries. This route was always required by the spec but was missing from the codebase until the audit pass.
 
 ## 5. Testing & Verification
 * **Automated tests:**
@@ -43,5 +44,5 @@ status: "Built"
 * **Manually verified:** `handleRazorpayWebhook` securely verifies HMAC signatures and correctly handles idempotency via `ref_number`.
 
 ## 6. Dependencies & Deferred Work
-* **Depends on:** `verifyRazorpayWebhookSignature` from `@smart-school/payments`.
-* **Known issues/deferred:** Wire UI components to consume these server actions (deferred to Session 3).
+* **Depends on:** `verifyRazorpayWebhookSignature` from `@smart-school/payments`. Requires `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` env vars.
+* **Known issues/deferred:** None outstanding. The missing webhook API route (originally deferred) was added in the audit pass on 2026-07-24. The `feeAssignmentId` is sourced from Razorpay order `notes.fee_assignment_id`, set at order creation — if notes are absent (e.g. order created outside this system), the webhook handler returns 200 with an error log rather than 500, to avoid Razorpay retrying a fundamentally unresolvable request.

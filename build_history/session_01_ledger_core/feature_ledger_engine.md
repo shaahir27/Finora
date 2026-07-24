@@ -37,7 +37,7 @@ status: "Built"
   ): Promise<Transaction>
   // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
-  * `applyWaiver` (`apps/web/src/app/actions/ledger.ts`): Applies a financial waiver to a specific fee assignment with mandatory audit logging.
+  * `applyWaiver` (`apps/web/src/app/actions/ledger.ts`): Applies a financial waiver to a specific fee assignment with mandatory audit logging. Also triggers a defaulter score recompute for the affected student. **Correction applied 2026-07-24**: the defaulter score recompute loop used `totalWaived` (a cumulative sum across all assignments) as the per-assignment waived amount in `calculateRemainingBalance`, causing the remaining balance to be underestimated on the 2nd+ assignment and producing a wrong defaulter score after any waiver. Fixed to capture per-assignment `wv` before accumulating into `totalWaived`.
   ```typescript
   export async function applyWaiver(
     adminId: string, schoolId: string, feeAssignmentId: string,
@@ -75,4 +75,4 @@ status: "Built"
 
 ## 6. Dependencies & Deferred Work
 * **Depends on:** `detectAnomaly` and `computeDefaulterScore` from `packages/rules`.
-* **Known issues/deferred:** Razorpay webhook routing and AI narration of anomalies are deferred to Sessions 2 and 4.
+* **Known issues/deferred:** AI narration of anomalies deferred to Session 4. Razorpay webhook API route (always required) was deferred to Session 2 and ultimately built in the 2026-07-24 audit pass. The `applyWaiver` cumulative-waived bug in the defaulter score recompute loop was identified and fixed in the 2026-07-24 audit pass — see Section 4 correction.

@@ -9,10 +9,13 @@ import { ChannelBarChart } from "@/components/ChannelBarChart";
 import { GlassCard } from "@/components/GlassCard";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 export function DashboardClient({ schoolId }: { schoolId: string }) {
   const [realtimeLive, setRealtimeLive] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const router = useRouter();
 
   // Subscribe to realtime updates on the transactions table
   useEffect(() => {
@@ -45,6 +48,27 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
     isRealtimeLive: realtimeLive,
   });
 
+  const handleExport = () => {
+    if (state.status === "success" && state.data) {
+      const csvData = [
+        ["Metric", "Value"],
+        ["Collected Today", state.data.totalCollected],
+        ["Outstanding Dues", state.data.outstandingDuesTotal],
+        ["Flagged Transactions", state.data.reconciliationStats.flaggedCount]
+      ].map(e => e.join(",")).join("\\n");
+      const blob = new Blob([csvData], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dashboard_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Dashboard data exported");
+    } else {
+      toast.error("Data not loaded yet");
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -53,8 +77,8 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
           <p className="text-text-secondary">Financial overview and real-time metrics.</p>
         </div>
         <div className="flex gap-2">
-          <QuickActionButton label="Mark Paid" />
-          <QuickActionButton label="Export" />
+          <QuickActionButton label="Mark Paid" onClick={() => router.push("/admin/ledger")} />
+          <QuickActionButton label="Export" onClick={handleExport} />
         </div>
       </div>
 

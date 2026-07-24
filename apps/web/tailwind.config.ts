@@ -11,6 +11,7 @@ const config: Config = {
     extend: {
       colors: {
         'bg-base': 'var(--color-bg-base)',
+        'bg-surface': 'var(--color-bg-surface)',
         'surface-glass': 'var(--color-surface-glass)',
         'surface-glass-hero': 'var(--color-surface-glass-hero)',
         'border-glass': 'var(--color-border-glass)',
@@ -18,6 +19,8 @@ const config: Config = {
         'text-secondary': 'var(--color-text-secondary)',
         'accent-primary': 'var(--color-accent-primary)',
         'accent-primary-text': 'var(--color-accent-primary-text)',
+        'accent-emerald': 'var(--color-accent-emerald)',
+        'accent-gold': 'var(--color-accent-gold)',
         'risk-high': 'var(--color-risk-high)',
         'risk-medium': 'var(--color-risk-medium)',
         'risk-low': 'var(--color-risk-low)',

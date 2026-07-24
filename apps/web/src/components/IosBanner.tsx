@@ -21,7 +21,7 @@ export function IosBanner() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#1B1712] border-t border-gray-200 dark:border-gray-800 p-4 shadow-lg flex items-start gap-4">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-base border-t border-gray-200 dark:border-gray-800 p-4 shadow-lg flex items-start gap-4">
       <div className="flex-1">
         <p className="text-sm text-gray-800 dark:text-gray-200">
           Add to Home Screen for the full app experience — tap Share, then Add to Home Screen

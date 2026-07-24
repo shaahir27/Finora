@@ -12,4 +12,4 @@ export {
   type RazorpayOrder,
   type RazorpayPayment,
   type WebhookPayload,
-} from "./razorpay.js";
+} from "./razorpay";

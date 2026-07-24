@@ -14,6 +14,7 @@
 
 import { useState, useId } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const DEMO_EMAIL = "admin@school.edu";
 const DEMO_PASSWORD = "demo1234";
@@ -49,13 +50,19 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
+      <div
+      className="min-h-screen flex items-center justify-center p-4 relative"
       style={{
         background: "var(--color-bg-base)",
         fontFamily: "'Inter', sans-serif",
       }}
     >
+      <Link 
+        href="/" 
+        className="absolute top-6 left-6 z-50 text-sm font-medium text-text-primary/60 hover:text-text-primary flex items-center gap-2 transition-colors"
+      >
+        <span>←</span> Back to Home
+      </Link>
       {/* Background glow orbs */}
       <div
         aria-hidden="true"

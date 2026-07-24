@@ -1,20 +1,46 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDefaulters } from "@/app/actions/defaulters";
+import { getDefaulters, queueRemindersForStudent, escalateDefaulterScore } from "@/app/actions/defaulters";
 import { useDataState } from "@/lib/useDataState";
 import { FiveStateRenderer } from "@/components/FiveStateRenderer";
 import { GlassCard } from "@/components/GlassCard";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { RiskBadge } from "@/components/RiskBadge";
+import { useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
 export default function DefaultersPage() {
   const schoolId = "demo-school-id"; // Mocked
+  const queryClient = useQueryClient();
 
   const state = useDataState({
     queryKey: ['defaulters', schoolId],
     queryFn: () => getDefaulters(schoolId),
   });
+
+  const handleSendReminder = async (studentId: string) => {
+    try {
+      const res = await queueRemindersForStudent(schoolId, studentId);
+      if (res.queuedCount > 0) {
+        toast.success(`${res.queuedCount} reminder(s) queued successfully!`);
+      } else {
+        toast.error("No overdue assignments to remind for, or reminder already exists.");
+      }
+    } catch (err) {
+      toast.error("Failed to queue reminder.");
+    }
+  };
+
+  const handleEscalate = async (studentId: string) => {
+    try {
+      await escalateDefaulterScore(schoolId, studentId);
+      toast.success("Student risk level escalated to High!");
+      queryClient.invalidateQueries({ queryKey: ['defaulters', schoolId] });
+    } catch (err) {
+      toast.error("Failed to escalate.");
+    }
+  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -55,8 +81,8 @@ export default function DefaultersPage() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <QuickActionButton label="Send Reminder" />
-                    <QuickActionButton label="Escalate" />
+                    <QuickActionButton label="Send Reminder" onClick={() => handleSendReminder(defaulter.studentId)} />
+                    <QuickActionButton label="Escalate" onClick={() => handleEscalate(defaulter.studentId)} />
                   </div>
                 </GlassCard>
               ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { getStudents } from "@/app/actions/students";
 import { useDataState } from "@/lib/useDataState";
 import { FiveStateRenderer } from "@/components/FiveStateRenderer";
@@ -8,6 +9,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { QuickActionButton } from "@/components/QuickActionButton";
 
 export default function StudentsDirectoryPage() {
+  const router = useRouter();
   const schoolId = "demo-school-id"; // Mocked
   const [search, setSearch] = useState("");
 
@@ -31,8 +33,8 @@ export default function StudentsDirectoryPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <QuickActionButton label="Import CSV" />
-          <QuickActionButton label="Add Student" />
+          <QuickActionButton label="Import CSV" onClick={() => router.push("/admin/settings")} />
+          <QuickActionButton label="Add Student" onClick={() => router.push("/admin/students?action=new")} />
         </div>
       </div>
 

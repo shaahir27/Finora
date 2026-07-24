@@ -26,11 +26,11 @@ status: "Built"
   ```typescript
   // export function computeDefaulterScore(daysOverdue: number, brokenPromiseCount: number, totalAmount: number | string, totalAmountPaid: number | string, totalWaivedAmount: number | string): { riskLevel: RiskLevel; riskScore: number; reason: string }
   ```
-  * `getDefaulters` (`apps/web/src/app/actions/defaulters.ts`): Queries active students and maps them to their highest overdue assignment score.
+  * `getDefaulters` (`apps/web/src/app/actions/defaulters.ts`): Queries active students and maps them to their highest overdue assignment score. **Correction applied 2026-07-24**: original implementation used `prisma.defaulterScore.create()` on every call, inserting a new row per student per page load (unbounded DB growth). Fixed to use an upsert pattern: if a score row exists for the student for today, it is updated; otherwise a new row is created.
   ```typescript
   // export async function getDefaulters(schoolId: string)
   ```
-  * `DefaulterTrackingPage` (`apps/web/src/app/admin/defaulters/page.tsx`): The UI displaying the ranked list.
+  * `DefaultersPage` (`apps/web/src/app/admin/defaulters/page.tsx`): The UI view rendering the state of all students with active defaults.
 
 ## 5. Testing & Verification
 * **Automated tests:** `apps/web/tests/session3.test.ts` — verified that `computeDefaulterScore` ranks partially-paid students strictly lower than identically-overdue students who have paid nothing. Also verified that `getDefaulters` accurately excludes `withdrawn` status students.
@@ -38,4 +38,4 @@ status: "Built"
 
 ## 6. Dependencies & Deferred Work
 * **Depends on:** Fee Engine, Ledger Engine
-* **Known issues/deferred:** Broken promises metric currently always receives 0 until the Reminder Notification system is fully wired.
+* **Known issues/deferred:** Broken promises metric currently always receives 0 until the Reminder Notification system is fully wired (known, acceptable for demo). Duplicate `defaulterScore` insert issue (each page load inserting a new row) was resolved in the 2026-07-24 audit pass — see Section 4 correction.

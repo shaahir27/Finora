@@ -100,7 +100,7 @@ export function PushSettingsToggle({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="flex items-center justify-between p-4 bg-white dark:bg-[#25201A] border border-gray-200 dark:border-gray-800 rounded-md shadow-sm">
+    <div className="flex items-center justify-between p-4 bg-white dark:bg-surface-glass border border-gray-200 dark:border-gray-800 rounded-md shadow-sm">
       <div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">Push Notifications</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -110,8 +110,8 @@ export function PushSettingsToggle({ userId }: { userId: string }) {
       <button
         onClick={handleToggle}
         disabled={loading}
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#8E7F65] focus:ring-offset-2 ${
-          isSubscribed ? "bg-[#B4A083]" : "bg-gray-200 dark:bg-gray-700"
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-core focus:ring-offset-2 ${
+          isSubscribed ? "bg-accent-core" : "bg-gray-200 dark:bg-gray-700"
         } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
       >
         <span

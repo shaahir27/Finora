@@ -4,19 +4,22 @@
 
 @layer base {
   :root {
-    --color-bg-base: #1B1712;
-    --color-surface-glass: rgba(245, 239, 227, 0.05);
-    --color-surface-glass-hero: rgba(20, 85, 92, 0.28);
-    --color-border-glass: rgba(245, 239, 227, 0.09);
-    --color-text-primary: #F5EFE3;
-    --color-text-secondary: rgba(245, 239, 227, 0.55);
+    --color-bg-base: #0A0C0F;
+    --color-bg-surface: #0F1115;
+    --color-surface-glass: rgba(255, 255, 255, 0.02);
+    --color-surface-glass-hero: rgba(63, 154, 163, 0.1);
+    --color-border-glass: rgba(255, 255, 255, 0.05);
+    --color-text-primary: #ffffff;
+    --color-text-secondary: rgba(255, 255, 255, 0.6);
     --color-accent-primary: #14555C;
     --color-accent-primary-text: #3F9AA3;
+    --color-accent-emerald: #6BBF82;
+    --color-accent-gold: #F2C94C;
     --color-risk-high: #A6432D;
-    --color-risk-medium: #9C5E22;
-    --color-risk-low: #4A7C59;
-    --color-status-posted: #4A7C59;
-    --color-status-cheque-pending: #9C5E22;
+    --color-risk-medium: #F2C94C;
+    --color-risk-low: #6BBF82;
+    --color-status-posted: #6BBF82;
+    --color-status-cheque-pending: #F2C94C;
     --color-status-flagged: #A6432D;
     --color-status-reversed: #8A7F6E;
   }

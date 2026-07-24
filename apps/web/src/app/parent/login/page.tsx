@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { GlassCard } from "@/components/GlassCard";
 import { supabase } from "@/lib/supabase-client";
 
@@ -46,7 +47,7 @@ export default function ParentLoginPage() {
 
         if (authError) {
           // Identify unprovisioned user error to show correct messaging
-          if (authError.message.includes("Signups not allowed") || authError.status === 400) {
+          if (authError.message.includes("Signups not allowed") || authError.status === 400 || authError.status === 422) {
              throw new Error("Number not registered. Please contact your school to link your account.");
           }
           throw authError;
@@ -60,7 +61,7 @@ export default function ParentLoginPage() {
         });
 
         if (authError) {
-          if (authError.message.includes("Signups not allowed") || authError.status === 400) {
+          if (authError.message.includes("Signups not allowed") || authError.status === 400 || authError.status === 422) {
             throw new Error("Email not registered. Please contact your school to link your account.");
           }
           throw authError;
@@ -110,7 +111,13 @@ export default function ParentLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center p-4 relative">
+      <Link 
+        href="/" 
+        className="absolute top-6 left-6 z-50 text-sm font-medium text-text-secondary hover:text-white flex items-center gap-2 transition-colors"
+      >
+        <span>←</span> Back to Home
+      </Link>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Finora</h1>

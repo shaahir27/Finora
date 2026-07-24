@@ -22,6 +22,7 @@ export type {
   OfflineSyncConflict,
   OcrStaging,
   ReminderLog,
+  Receipt,
   UserRole,
   StudentStatus,
   BalanceDisposition,
@@ -30,6 +31,7 @@ export type {
   ReconciliationStatus,
   ReminderChannel,
   ReminderStatus,
+  ReceiptFormat,
 } from "@prisma/client";
 
 // Singleton client for server-side use only.

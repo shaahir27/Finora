@@ -476,11 +476,18 @@ export async function applyWaiver(
       totalAmount += a.amount.toNumber();
       const pd = calculateAmountPaid(a.transactions);
       totalPaid += pd;
-      totalWaived += calculateWaivedAmount(a.waivers);
-      
-      const bal = calculateRemainingBalance(a.amount.toNumber(), pd, totalWaived);
+      // Use per-assignment wv for balance check, then accumulate into totalWaived.
+      // Bug fix: previously totalWaived (cumulative) was passed to calculateRemainingBalance,
+      // which underestimated balance on 2nd+ assignment and produced a wrong defaulter score.
+      const wv = calculateWaivedAmount(a.waivers);
+      totalWaived += wv;
+
+      const bal = calculateRemainingBalance(a.amount.toNumber(), pd, wv);
       if (bal > 0) {
-        const days = Math.floor((new Date().getTime() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        const days = Math.max(
+          0,
+          Math.floor((new Date().getTime() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
+        );
         if (days > maxDaysOverdue) maxDaysOverdue = days;
       }
     }
