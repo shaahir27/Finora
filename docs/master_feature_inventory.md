@@ -87,7 +87,7 @@
 
 | Feature | Description | Primary Code Files | Zero-Key Requirement | Status |
 |---|---|---|---|---|
-| **AI Audio Fee Soundbox** | Provides bilingual (Hindi/English) voice confirmation when payments or cheque clearances post, using W3C `SpeechSynthesis`. | `apps/web/src/lib/soundbox.ts`, `SoundboxToggle.tsx` | 0 External API Keys | Verified ✅ |
+| **AI Audio Fee Soundbox** | Provides bilingual (Hindi/English) voice confirmation when payments post, triggered in: (1) Admin Finance Ops on cheque clearance and OCR confirmation, (2) Parent UPI Sandbox payment at `/parent/pay`, and (3) Parent combined family dues payment at `/parent/dues`. Uses W3C `SpeechSynthesis` — zero external API. | `apps/web/src/lib/soundbox.ts`, `SoundboxToggle.tsx`, `apps/web/src/app/parent/pay/page.tsx`, `apps/web/src/app/parent/dues/page.tsx` | 0 External API Keys | Verified ✅ |
 | **WhatsApp 1-Tap UPI Payment Links** | Dispatches interactive WhatsApp links (`https://wa.me/...`) with pre-filled student details and 1-tap Google Pay/PhonePe checkout. | `apps/web/src/lib/whatsapp.ts` | 0 External API Keys | Verified ✅ |
 | **Smart Sibling WhatsApp Bundling** | Aggregates dues for parents with 2+ children into a single single-card WhatsApp payment link. | `apps/web/src/lib/whatsapp.ts` | 0 External API Keys | Verified ✅ |
 | **Dynamic Student UPI QR Code Generator** | Builds NPCI-compliant UPI URIs (`upi://pay?pa=...&tr=feeAssignmentId`) containing embedded transaction references for 100% auto-reconciliation. | `apps/web/src/lib/upiQr.ts` | 0 External API Keys | Verified ✅ |
@@ -105,6 +105,7 @@
 | **Native PWA & Service Worker** | Progressive Web App manifest (`manifest.json`), service worker, and offline asset caching. | `apps/web/public/manifest.json` | Verified ✅ |
 | **VAPID Web Push Notifications** | Native PWA push notifications dispatched via `web-push` for payment events and anomaly alerts. | `apps/web/src/app/actions/push.ts` | Verified ✅ |
 | **TanStack React Query v5** | Client-side state synchronization wrapping Supabase Realtime and server action queries via `useDataState`. | `apps/web/src/lib/useDataState.ts` | Verified ✅ |
-| **Glassmorphic Mobile-First Design** | Custom Vanilla CSS design system with glassmorphism, responsive bottom nav, and mobile-optimized viewports. | `apps/web/src/app/globals.css`, `GlassCard.tsx` | Verified ✅ |
+| **Glassmorphic Mobile-First Design** | Warm Alabaster Sand & Imperial Emerald light theme. Vanilla CSS design system with glassmorphism, responsive sidebar (desktop) + bottom nav (mobile), mobile-optimized viewports. | `apps/web/src/globals.css`, `GlassCard.tsx` | Verified ✅ |
+| **Landing Page Premium Animations** | Multi-layer animation stack: Framer Motion spring physics, Interactive HTML5 `AmbientParticlesCanvas` (emerald constellation particle mesh with node-linking), `canvas-confetti` celebratory bursts on soundbox triggers, 3D mouse-tilt `TiltSpotlightCard` with radial spotlight, animated `SoundEqualizer` waveform. | `apps/web/src/app/page.tsx` | Verified ✅ |
 | **Strict Type Checking** | Zero TypeScript compilation errors across all workspace packages (`pnpm --filter web exec tsc --noEmit`). | Entire Monorepo | Verified ✅ |
 | **Automated Test Suite** | 54 out of 54 Vitest unit and integration tests passing cleanly. | `pnpm test` | 100% Green ✅ |

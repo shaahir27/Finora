@@ -102,13 +102,13 @@ sequenceDiagram
    - Watch the entire parent portal instantly translate into Hindi (*"कुल बकाया शुल्क"*, *"भुगतान करें"*).
 
 3. **Action 3 — Section 80C Tax Certificate Generator**:
-   - Switch to `/parent/history`.
+   - Switch to `/parent/dues` and scroll to the **Tax Cert** section.
    - Click **"Section 80C Tax Cert (FY 2025-26)"**.
    - Show how Finora automatically extracts pure tuition fee components paid during the financial year, outputting an official claimable tax certificate.
 
-4. **Action 4 — Parent Payment Simulation & GST Receipt**:
-   - Click **Pay Now** on Parent Dues.
-   - Complete the Sandbox UPI payment simulation.
+4. **Action 4 — Parent Payment Simulation, Soundbox, & GST Receipt**:
+   - Click **Pay Now** on a due. Complete the Sandbox UPI payment.
+   - **LISTEN**: Finora's AI Soundbox fires automatically in the parent view too!
    - Download the instant **GST-Compliant A4 / POS Receipt PDF**.
 
 ---

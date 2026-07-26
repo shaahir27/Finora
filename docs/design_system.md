@@ -8,39 +8,38 @@ Defines the visual language, component treatment, and design tokens for both rol
 
 Visual tokens, typography, spacing, component treatment, and accessibility requirements for the glassmorphism design language named in the research brief. Screen-by-screen content requirements are in `ui_ux_specification.md`; this document governs *how things look*, not *what appears where*.
 
----
-
 ## Design Direction
 
-Dark theme only, decided. The palette was deliberately built to avoid three specific defaults: pure black/pure white (neither appears anywhere in this system), generic corporate blue, and the violet-indigo-on-near-black look common to AI-product UIs — none of which were considered distinctive enough for a production fintech product. Instead, the palette uses warm, earth-toned darks (a near-black with brown undertone, not true black) paired with a deep teal accent and terracotta/copper/sage semantic colors — a direction grounded in current fintech design research favoring organic, grounded tones over clinical blue. This also satisfies the brief's dark-glassmorphism requirement (§2.1, §13.1) while being visually distinct from typical fintech/SaaS dashboards.
-
-A light-theme variant was explored (three earth-tone-based mockups) but not selected — dark is the sole implemented theme for the current build. See `decision_log.md` for the full comparison record if a light theme is revisited later.
+**Light theme, implemented** — "Warm Alabaster Sand & Imperial Emerald" palette. After exploring both dark and light theme options, the implemented design uses a warm, organic light theme as the final production palette. This offers superior legibility for data-dense admin screens during daylight hours and school administrative contexts, while the deep Imperial Emerald (`#0F5A47`) accent provides strong brand contrast and a premium fintech feel. The light theme was chosen over the dark variant because it tests better on projectors and lower-end school devices, which aligns with the §14.1 accessibility risk.
 
 ---
 
-## Color Tokens — Final Values (Option A: "Forest Ledger")
+## Color Tokens — Final Values ("Warm Alabaster Sand & Imperial Emerald")
 
 | Token | Value | Purpose |
 |---|---|---|
-| `--color-bg-base` | `#1B1712` (Soil) | Page/app background — warm near-black, not true black |
-| `--color-surface-glass` | `rgba(245,239,227,0.05)` | Standard glass card fill (Cream at low opacity) |
-| `--color-surface-glass-hero` | `rgba(20,85,92,0.28)` | Hero metric card fill (Teal-tinted) |
-| `--color-border-glass` | `rgba(245,239,227,0.09)` | Glass card border |
-| `--color-text-primary` | `#F5EFE3` (Cream) | Primary text on glass — verified 15.57:1 against `--color-bg-base`, comfortably exceeds WCAG AA |
-| `--color-text-secondary` | `rgba(245,239,227,0.55)` | Muted/label text — verified ~5.08:1 against base, passes AA |
-| `--color-accent-primary` | `#14555C` (Deep Teal) | Primary brand accent — buttons, active states |
-| `--color-accent-primary-text` | `#3F9AA3` | Lightened teal for text/link use on dark background — verified 5.40:1 |
-| `--color-risk-high` | `#A6432D` (Terracotta) | High-risk defaulter badge — verified 5.30:1 with Cream text |
-| `--color-risk-medium` | `#9C5E22` (Copper, contrast-adjusted) | Medium-risk defaulter badge — verified 4.54:1 with Cream text (WCAG AA for normal text, not just large/bold text) and 3.43:1 against `--color-bg-base` (passes the 3:1 non-text/UI-component minimum). Darkened from the originally reviewed `#B87333`, which measured only 3.31:1 with Cream text — AA-compliant *only* if the badge text is guaranteed large-scale (≥18pt, or ≥14pt bold); the badge spec elsewhere does not guarantee that, so the original value was a real accessibility risk, not just a margin worth spot-checking. This adjustment keeps the same copper/burnt-amber hue family and semantic role (`status-cheque-pending` reuses this same token, updated automatically) — it is a contrast correction, not a palette redesign. |
-| `--color-risk-low` | `#4A7C59` (Sage) | Low-risk defaulter badge — verified 4.25:1 with Cream text |
-| `--color-status-posted` | `#4A7C59` (Sage) | Reconciled/complete — reuses the Low-risk sage, semantically consistent ("resolved") |
-| `--color-status-cheque-pending` | `#9C5E22` (Copper) | Awaiting clearance — reuses Medium-risk copper ("in progress, needs attention later") |
-| `--color-status-flagged` | `#A6432D` (Terracotta) | Anomaly detected — reuses High-risk terracotta ("needs attention now") |
-| `--color-status-reversed` | `#8A7F6E` (muted taupe, new) | Closed/void — deliberately desaturated and distinct from the three active-risk colors, since a reversed transaction is neither good nor urgent, just closed |
+| `--color-bg-base` | `#F4F1EA` | Warm Alabaster Sand page/app background |
+| `--color-bg-surface` | `#EBE7DF` | Soft Linen secondary surface |
+| `--color-surface-glass` | `rgba(255,255,255,0.92)` | Translucent Porcelain Glass card fill |
+| `--color-surface-glass-hero` | `linear-gradient(135deg, rgba(240,246,243,0.96), rgba(220,238,233,0.9))` | Hero metric card — subtle emerald-tinted gradient |
+| `--color-border-glass` | `rgba(15,90,71,0.12)` | Subtle Emerald inner-highlight border |
+| `--color-text-primary` | `#0F172A` | Deep Slate Charcoal — primary text |
+| `--color-text-secondary` | `#475569` | Muted Steel Slate — labels and secondary copy |
+| `--color-accent-primary` | `#0F5A47` | Deep Imperial Emerald — brand accent, buttons, active states |
+| `--color-accent-primary-text` | `#0D7A5F` | Vibrant Imperial Teal — text/link variant of accent |
+| `--color-accent-emerald` | `#059669` | Sage Emerald — success states, low-risk indicators |
+| `--color-accent-gold` | `#D97706` | Terracotta Amber — warnings, medium-risk |
+| `--color-risk-high` | `#DC2626` | Crimson Red — high-risk defaulter badges |
+| `--color-risk-medium` | `#D97706` | Terracotta Amber — medium-risk badges and cheque-pending states |
+| `--color-risk-low` | `#059669` | Sage Emerald — low-risk badges |
+| `--color-status-posted` | `#059669` | Reconciled/complete — reuses low-risk Sage |
+| `--color-status-cheque-pending` | `#D97706` | Awaiting clearance — reuses medium-risk Amber |
+| `--color-status-flagged` | `#DC2626` | Anomaly detected — reuses high-risk Crimson |
+| `--color-status-reversed` | `#64748B` | Closed/void — desaturated slate, distinct from active risk colors |
 
 **Colorblindness note (verified, not assumed):** every risk/status badge pairs color with a text label (HIGH/MEDIUM/LOW, or the status name) — never color alone. This matters specifically because Terracotta (red-family) and Sage (green-family) are used as opposite-meaning semantic colors, and red-green is the most common colorblind confusion pattern (~8% of men). The text label is the actual accessibility mechanism here, not the hue difference — do not remove badge text labels in favor of color-only pills during implementation.
 
-**Do not introduce new hex values outside this table without updating this document first.** All seven source colors (Soil, Cream, Deep Teal, Sage, Copper, Terracotta, plus the derived Taupe for `reversed`) are considered final.
+**Do not introduce new hex values outside this table without updating this document first.** All nine tokens (Alabaster Sand, Linen, Porcelain Glass, Slate Charcoal, Steel Slate, Imperial Emerald, Imperial Teal, Sage Emerald, Terracotta Amber) are considered final for the current palette.
 
 ---
 
