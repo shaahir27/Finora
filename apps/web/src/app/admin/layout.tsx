@@ -17,19 +17,22 @@ const PUBLIC_PATHS = ["/admin/login"];
 
 function NavItem({ href, icon: Icon, children, onClick }: { href: string; icon: any; children: ReactNode; onClick?: () => void }) {
   const pathname = usePathname();
-  const isActive = pathname.startsWith(href);
+  const isActive = pathname === href || (href !== "/admin" && pathname.startsWith(href));
   return (
     <Link 
       href={href} 
       {...(onClick ? { onClick: () => onClick() } : {})}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+      className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
         isActive 
-          ? "bg-[#0F5A47]/10 text-[#0F5A47] font-semibold shadow-[inset_3px_0_0_#0F5A47]" 
-          : "text-text-secondary hover:bg-black/5 hover:text-text-primary"
+          ? "bg-[#0F5A47] text-white font-bold shadow-md shadow-[#0F5A47]/20 border border-[#0F5A47]/30" 
+          : "text-text-secondary hover:bg-black/5 hover:text-text-primary font-medium"
       }`}
     >
-      <Icon className={`w-4 h-4 ${isActive ? "text-[#0F5A47]" : "text-text-secondary"}`} />
-      <span className="text-sm font-medium tracking-tight">{children}</span>
+      <div className="flex items-center gap-3">
+        <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-text-secondary"}`} />
+        <span className="text-xs tracking-tight">{children}</span>
+      </div>
+      {isActive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />}
     </Link>
   );
 }
@@ -63,7 +66,6 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (
       status === "unauthenticated" &&
-      process.env.NODE_ENV === "production" &&
       !PUBLIC_PATHS.some((p) => pathname.startsWith(p))
     ) {
       router.replace("/admin/login");
@@ -143,9 +145,16 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
             </NavGroup>
           </nav>
 
-          <div className="p-4 border-t border-border-glass mt-auto bg-white/5">
-            <p className="text-[10px] text-text-secondary uppercase tracking-wider">Logged in as</p>
-            <p className="text-sm font-medium text-text-primary truncate mt-0.5">{session?.user?.email || "admin@school.edu"}</p>
+          <div className="p-4 border-t border-border-glass mt-auto bg-white/5 space-y-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-[#0F5A47]/20 border border-[#0F5A47]/30 flex items-center justify-center font-bold text-xs text-[#0F5A47]">
+                {(session?.user?.email?.[0] || "A").toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-text-primary truncate">{session?.user?.email || "admin@school.edu"}</p>
+                <p className="text-[10px] text-[#0F5A47] font-extrabold uppercase tracking-wider">School Admin</p>
+              </div>
+            </div>
             <button
               id="admin-logout-btn"
               type="button"
@@ -153,7 +162,7 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
                 await signOut({ redirect: false });
                 window.location.href = window.location.origin + "/admin/login";
               }}
-              className="mt-3 text-xs font-medium text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+              className="w-full py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-500/10 transition-colors text-center cursor-pointer border border-red-500/20"
             >
               Sign out
             </button>

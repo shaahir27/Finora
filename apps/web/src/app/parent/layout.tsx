@@ -18,17 +18,18 @@ function ParentSidebar({ closeMenu }: { closeMenu?: () => void }) {
   const pathname = usePathname();
 
   const navItems = [
-    { labelKey: "dues", href: "/parent/dues", icon: "📊" },
-    { labelKey: "history", href: "/parent/history", icon: "💳" },
-    { labelKey: "copilot", href: "/parent/copilot", icon: "🤖" },
-    { labelKey: "settings", href: "/parent/settings", icon: "⚙️" },
+    { labelKey: "cockpit", href: "/parent/cockpit", icon: "🏠", fallbackLabel: "Household Cockpit" },
+    { labelKey: "dues", href: "/parent/dues", icon: "📊", fallbackLabel: "Fee Dues" },
+    { labelKey: "history", href: "/parent/history", icon: "💳", fallbackLabel: "Payment History" },
+    { labelKey: "copilot", href: "/parent/copilot", icon: "🤖", fallbackLabel: "Parent AI Assistant" },
+    { labelKey: "settings", href: "/parent/settings", icon: "⚙️", fallbackLabel: "Settings" },
   ];
 
   return (
     <div className="w-full h-full bg-[#F4F1EA] flex flex-col justify-between p-4 border-r border-[#0F5A47]/15">
       <div className="space-y-6">
         <div className="flex justify-between items-center px-2 pt-2">
-          <Link href="/parent/dues" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+          <Link href="/parent/cockpit" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white bg-gradient-to-br from-[#0F5A47] to-[#0D7A5F] shadow-md shadow-[#0F5A47]/20">
               ₹
             </div>
@@ -41,20 +42,25 @@ function ParentSidebar({ closeMenu }: { closeMenu?: () => void }) {
         
         <nav className="space-y-1.5 pt-4">
           {navItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+            const isActive = pathname === item.href || (item.href !== "/parent" && pathname.startsWith(item.href));
+            const translatedLabel = t(item.labelKey as any);
+            const displayLabel = translatedLabel.includes(".") || translatedLabel === item.labelKey ? item.fallbackLabel : translatedLabel;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 {...(closeMenu ? { onClick: closeMenu } : {})}
-                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                   isActive
                     ? "bg-[#0F5A47] text-white shadow-md shadow-[#0F5A47]/20"
                     : "text-text-secondary hover:text-text-primary hover:bg-black/5"
                 }`}
               >
-                <span>{item.icon}</span>
-                <span>{t(item.labelKey as any)}</span>
+                <div className="flex items-center gap-2.5">
+                  <span>{item.icon}</span>
+                  <span>{displayLabel}</span>
+                </div>
+                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />}
               </Link>
             );
           })}
@@ -68,7 +74,7 @@ function ParentSidebar({ closeMenu }: { closeMenu?: () => void }) {
             await signOut({ redirect: false });
             window.location.href = window.location.origin + "/parent/login";
           }}
-          className="w-full py-2 px-3 rounded-xl text-xs font-bold text-red-600 hover:bg-red-500/10 transition-colors text-left flex items-center gap-2 cursor-pointer"
+          className="w-full py-2 px-3 rounded-xl text-xs font-bold text-red-600 hover:bg-red-500/10 transition-colors text-left flex items-center gap-2 cursor-pointer border border-red-500/20"
         >
           <span>🚪</span>
           <span>{t("logout")}</span>
@@ -96,7 +102,6 @@ function ParentLayoutInner({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (
       status === "unauthenticated" &&
-      process.env.NODE_ENV === "production" &&
       !PUBLIC_PATHS.some((p) => pathname.startsWith(p))
     ) {
       router.replace("/parent/login");

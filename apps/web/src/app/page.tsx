@@ -25,7 +25,13 @@ import {
   FileCheck,
   TrendingUp,
   CreditCard,
+  Volume2,
+  MessageSquare,
+  QrCode,
+  FileText as FileTax,
 } from "lucide-react";
+import { playPaymentSoundbox } from "@/lib/soundbox";
+import { buildWhatsAppPaymentUrl, buildSiblingBundledWhatsAppUrl } from "@/lib/whatsapp";
 
 // ─── Animation Variants ───────────────────────────────────────────────────────
 
@@ -227,7 +233,13 @@ function Hero() {
 // ─── Live Sandbox Terminal Component ─────────────────────────────────────────
 
 function LiveTerminalShowcase() {
-  const [activeTab, setActiveTab] = useState<"rec" | "tally" | "ai" | "parent">("rec");
+  const [activeTab, setActiveTab] = useState<"rec" | "tally" | "ai" | "soundbox" | "whatsapp" | "parent">("rec");
+  const [soundLang, setSoundLang] = useState<"en" | "hi">("en");
+
+  const triggerSound = (lang: "en" | "hi") => {
+    setSoundLang(lang);
+    playPaymentSoundbox(5000, "Rahul Sharma", "Class 5", lang);
+  };
 
   return (
     <section id="sandbox" className="py-24 px-6 bg-[#EBE7DF] border-t border-[#0F5A47]/15 relative">
@@ -240,7 +252,7 @@ function LiveTerminalShowcase() {
             Test-Drive Finora Core Engines Live
           </h2>
           <p className="text-[#475569] text-sm max-w-xl mx-auto font-medium">
-            Click across the tabs below to preview how our financial engines handle real-time bank feeds, Tally XML formatting, and AI prompt analysis.
+            Click across the tabs below to test live audio confirmations, WhatsApp payment links, bank reconciliation, and Tally XML exports.
           </p>
         </div>
 
@@ -266,7 +278,29 @@ function LiveTerminalShowcase() {
                     : "text-[#475569] hover:text-[#0F172A] hover:bg-black/5"
                 }`}
               >
-                ⚡ Bank Reconciliation
+                ⚡ Reconciliation
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("soundbox")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                  activeTab === "soundbox"
+                    ? "bg-[#0F5A47] text-white shadow-md"
+                    : "text-[#475569] hover:text-[#0F172A] hover:bg-black/5"
+                }`}
+              >
+                📢 AI Audio Soundbox
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("whatsapp")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                  activeTab === "whatsapp"
+                    ? "bg-[#0F5A47] text-white shadow-md"
+                    : "text-[#475569] hover:text-[#0F172A] hover:bg-black/5"
+                }`}
+              >
+                💬 WhatsApp 1-Tap
               </button>
               <button
                 type="button"
@@ -372,6 +406,69 @@ function LiveTerminalShowcase() {
               </div>
             )}
 
+            {activeTab === "soundbox" && (
+              <div className="space-y-5">
+                <div className="p-5 bg-[#0F5A47]/10 rounded-2xl border border-[#0F5A47]/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[#0F5A47] font-extrabold text-sm">
+                      <Volume2 className="w-4 h-4 text-[#059669] animate-bounce" />
+                      AI Audio Fee Soundbox Simulation
+                    </div>
+                    <p className="text-xs text-[#475569] font-medium">
+                      Simulates real-time voice broadcasts in Hindi and English when a fee payment is recorded.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => triggerSound("en")}
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-extrabold hover:shadow-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      Test English Voice (₹5,000)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerSound("hi")}
+                      className="px-4 py-2.5 rounded-xl bg-white text-[#0F172A] border border-[#0F5A47]/20 text-xs font-extrabold hover:bg-black/5 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      🔊 Test Hindi Voice (₹5,000)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-[#F4F1EA] rounded-2xl border border-[#0F5A47]/15 font-mono text-xs text-[#0F172A] space-y-2">
+                  <p className="text-[#059669] font-bold">// Web Speech Synthesis Audio Stream Output</p>
+                  <p>• Audio Text: {soundLang === "en" ? `"Received payment of 5,000 rupees for Rahul Sharma, Class 5. Thank you!"` : `"राहुल शर्मा, कक्षा 5 के लिए 5,000 रुपये का भुगतान प्राप्त हुआ। धन्यवाद!"`}</p>
+                  <p className="text-slate-500">• Hardware Acceleration: Web Speech API (Zero External Hardware Required)</p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "whatsapp" && (
+              <div className="space-y-5">
+                <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-sm">
+                    <MessageSquare className="w-4 h-4 text-emerald-600" />
+                    WhatsApp 1-Tap Payment Link & Sibling Bundled Deep Links
+                  </div>
+                  <p className="text-xs text-emerald-700 font-medium">
+                    Parents receive zero-login 1-tap WhatsApp messages with dynamic UPI links to pay individual or bundled sibling dues instantly.
+                  </p>
+                  <div className="p-3.5 bg-white rounded-xl border border-emerald-200 text-xs text-slate-800 font-mono space-y-1">
+                    <p className="font-bold text-emerald-700">Generated WhatsApp Direct Link Preview:</p>
+                    <p className="text-slate-600 font-bold break-all">{buildWhatsAppPaymentUrl({
+                      phone: "9876543210",
+                      studentName: "Rahul Sharma",
+                      studentClass: "Class 5-A",
+                      amountRupees: 5000,
+                      feeAssignmentId: "assign-101",
+                    })}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === "parent" && (
               <div className="space-y-4">
                 <div className="p-5 bg-[#F4F1EA] rounded-2xl border border-[#0F5A47]/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -381,7 +478,7 @@ function LiveTerminalShowcase() {
                     <p className="text-xs text-[#475569]">Bilingual Support (Hindi / English) • Instant Receipt PDF</p>
                   </div>
                   <Link
-                    href="/parent/dues"
+                    href="/parent/cockpit"
                     className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-bold hover:opacity-95 transition-all shadow-md"
                   >
                     Open Live Parent Portal &rarr;
@@ -390,6 +487,102 @@ function LiveTerminalShowcase() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── 7 Flagship Innovations Section ───────────────────────────────────────────
+
+function FlagshipInnovations() {
+  const innovations = [
+    {
+      title: "AI Audio Fee Soundbox",
+      tag: "INNOVATION #1",
+      desc: "Instant bilingual (Hindi/English) spoken audio confirmation on every successful payment record.",
+      icon: Volume2,
+      color: "from-amber-500/10 to-emerald-500/10 border-amber-500/20 text-amber-900",
+    },
+    {
+      title: "WhatsApp 1-Tap UPI Links",
+      tag: "INNOVATION #2",
+      desc: "Direct deep-linked WhatsApp messages allowing parents to pay single or sibling bundled dues instantly.",
+      icon: MessageSquare,
+      color: "from-emerald-500/10 to-teal-500/10 border-emerald-500/20 text-emerald-900",
+    },
+    {
+      title: "Dynamic Student UPI QR",
+      tag: "INNOVATION #3",
+      desc: "Exact-amount student-anchored UPI QR codes eliminating over/under payments.",
+      icon: QrCode,
+      color: "from-blue-500/10 to-cyan-500/10 border-blue-500/20 text-blue-900",
+    },
+    {
+      title: "Section 80C Tax Cert",
+      tag: "INNOVATION #4",
+      desc: "Instant 1-click Income Tax 80C PDF certificate generator for parent tuition fee exemptions.",
+      icon: FileTax,
+      color: "from-purple-500/10 to-indigo-500/10 border-purple-500/20 text-purple-900",
+    },
+    {
+      title: "Smart Reminder Muting",
+      tag: "INNOVATION #5",
+      desc: "Automated 24-hour grace muting after payments to prevent embarrassing duplicate reminders.",
+      icon: Shield,
+      color: "from-[#0F5A47]/10 to-[#059669]/10 border-[#0F5A47]/20 text-[#0F5A47]",
+    },
+    {
+      title: "Micro-Installment Engine",
+      tag: "INNOVATION #6",
+      desc: "Flexible split payments tailored for low-income families without admin friction.",
+      icon: TrendingUp,
+      color: "from-rose-500/10 to-orange-500/10 border-rose-500/20 text-rose-900",
+    },
+    {
+      title: "Tally Prime XML Export",
+      tag: "INNOVATION #7",
+      desc: "Official XML receipt voucher schema generator for seamless accounting sync.",
+      icon: FileCode2,
+      color: "from-teal-500/10 to-emerald-500/10 border-teal-500/20 text-teal-900",
+    },
+  ];
+
+  return (
+    <section id="innovations" className="py-24 px-6 bg-[#F4F1EA] border-t border-[#0F5A47]/15">
+      <div className="max-w-7xl mx-auto space-y-12">
+        <div className="text-center space-y-4">
+          <span className="px-4 py-1.5 rounded-full bg-[#0F5A47]/10 border border-[#0F5A47]/20 text-[#0F5A47] text-xs font-extrabold uppercase tracking-wider">
+            Flagship Engineering Features
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0F172A]">
+            7 Flagship Solutions Built into Finora
+          </h2>
+          <p className="text-[#475569] text-sm max-w-xl mx-auto font-medium">
+            Designed to solve real-world school collection friction with automated AI and zero-lag financial sync.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {innovations.map((item, idx) => (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.1 }}
+              className={`p-6 rounded-3xl bg-gradient-to-br ${item.color} border backdrop-blur-xl shadow-md hover:-translate-y-1 transition-all space-y-3`}
+            >
+              <div className="flex items-center justify-between">
+                <item.icon className="w-6 h-6 text-[#0F5A47]" />
+                <span className="px-2.5 py-1 rounded-full bg-[#0F5A47]/10 text-[#0F5A47] text-[10px] font-extrabold uppercase tracking-wider">
+                  {item.tag}
+                </span>
+              </div>
+              <h3 className="text-lg font-extrabold text-[#0F172A]">{item.title}</h3>
+              <p className="text-xs text-[#475569] font-medium leading-relaxed">{item.desc}</p>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>
@@ -514,7 +707,7 @@ function FloatingJudgeDock() {
         Admin Console
       </Link>
       <Link
-        href="/parent/dues"
+        href="/parent/cockpit"
         className="px-3.5 py-1.5 rounded-full bg-[#F4F1EA] text-[#0F172A] text-xs font-extrabold hover:bg-black/5 active:scale-95 transition-all border border-[#0F5A47]/20 flex items-center gap-1.5"
       >
         <Smartphone className="w-3.5 h-3.5 text-[#0F5A47]" />
@@ -542,6 +735,7 @@ export default function HomePage() {
       <main className="relative z-10">
         <Hero />
         <LiveTerminalShowcase />
+        <FlagshipInnovations />
         <ImpactMetrics />
         <TechArchitecture />
       </main>
