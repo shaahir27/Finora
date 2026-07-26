@@ -29,6 +29,8 @@ import {
   X,
 } from "lucide-react";
 
+import { playPaymentSoundbox } from "@/lib/soundbox";
+
 export default function ParentDuesPage() {
   const t = useTranslations("Dues");
   const router = useRouter();
@@ -168,6 +170,7 @@ export default function ParentDuesPage() {
       for (const due of unpaidDues) {
         await simulateSandboxPayment(due.id, due.remainingBalance);
       }
+      playPaymentSoundbox(totalOutstanding, "Family Dues");
       toast.success("Family dues cleared via UPI Sandbox!");
       window.location.reload();
     } catch (err: any) {

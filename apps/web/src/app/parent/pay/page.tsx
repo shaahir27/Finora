@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { GlassCard } from "@/components/GlassCard";
 import { payDueViaUpi, simulateSandboxPayment } from "@/app/actions/parents";
 import { useTranslations } from "next-intl";
+import { playPaymentSoundbox } from "@/lib/soundbox";
 
 function PayForm() {
   const t = useTranslations("Payment");
@@ -49,7 +50,9 @@ function PayForm() {
     // We now use a real backend call to simulate the webhook
     setLoading(true);
     try {
-      await simulateSandboxPayment(assignmentId!, parseFloat(amount));
+      const numAmt = parseFloat(amount);
+      await simulateSandboxPayment(assignmentId!, numAmt);
+      playPaymentSoundbox(numAmt);
       setSuccess(true);
       // Wait a moment then go back to dues
       setTimeout(() => router.push("/parent/dues"), 3000);
