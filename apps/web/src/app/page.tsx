@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import {
   ArrowRight,
   Bot,
@@ -32,6 +32,92 @@ import {
 } from "lucide-react";
 import { playPaymentSoundbox } from "@/lib/soundbox";
 import { buildWhatsAppPaymentUrl, buildSiblingBundledWhatsAppUrl } from "@/lib/whatsapp";
+
+// ─── Interactive 3D Mouse Tilt & Radial Spotlight Glow ──────────────────────────
+
+function TiltSpotlightCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  const rotateX = useTransform(y, [-0.5, 0.5], ["8deg", "-8deg"]);
+  const rotateY = useTransform(x, [-0.5, 0.5], ["-8deg", "8deg"]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+
+    const mouseXPos = e.clientX - rect.left;
+    const mouseYPos = e.clientY - rect.top;
+
+    const xPct = mouseXPos / width - 0.5;
+    const yPct = mouseYPos / height - 0.5;
+
+    x.set(xPct);
+    y.set(yPct);
+    mouseX.set(mouseXPos);
+    mouseY.set(mouseYPos);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <motion.div
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        rotateX,
+        rotateY,
+        transformStyle: "preserve-3d",
+      }}
+      className={`relative group transition-transform duration-200 ease-out ${className}`}
+    >
+      <motion.div
+        className="pointer-events-none absolute -inset-px rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10"
+        style={{
+          background: useTransform(
+            [mouseX, mouseY],
+            ([cx, cy]) => `radial-gradient(350px circle at ${cx}px ${cy}px, rgba(15, 90, 71, 0.18), transparent 80%)`
+          ),
+        }}
+      />
+      {children}
+    </motion.div>
+  );
+}
+
+// ─── Soundbox Audio Equalizer Waveform Animation ────────────────────────────
+
+function SoundEqualizer({ isPlaying }: { isPlaying: boolean }) {
+  return (
+    <div className="flex items-end gap-1 h-5 px-2 py-1 rounded-lg bg-[#0F5A47]/10 border border-[#0F5A47]/20">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <motion.div
+          key={i}
+          animate={
+            isPlaying
+              ? {
+                  height: ["20%", "90%", "40%", "100%", "30%"],
+                }
+              : { height: "25%" }
+          }
+          transition={{
+            duration: 0.4 + i * 0.1,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut",
+          }}
+          className="w-1 rounded-full bg-[#059669]"
+        />
+      ))}
+    </div>
+  );
+}
 
 // ─── Animation Variants ───────────────────────────────────────────────────────
 
@@ -169,61 +255,63 @@ function Hero() {
           transition={{ duration: 1, ease: "easeOut" }}
           className="relative w-full h-auto flex items-center justify-center py-6"
         >
-          {/* Main Glass Hero Card Container */}
-          <div className="relative w-full max-w-lg p-6 sm:p-7 rounded-3xl bg-white/95 backdrop-blur-2xl border border-[#0F5A47]/20 shadow-2xl shadow-[#0F5A47]/10 space-y-5">
-            {/* Top Brand Header */}
-            <div className="flex items-center justify-between border-b border-[#0F5A47]/15 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#0F5A47] to-[#059669] text-white flex items-center justify-center font-extrabold text-xl shadow-md">
-                  F
+          {/* Main Glass Hero Card Container with 3D Tilt & Mouse Spotlight Glow */}
+          <TiltSpotlightCard className="w-full max-w-lg">
+            <div className="relative w-full p-6 sm:p-7 rounded-3xl bg-white/95 backdrop-blur-2xl border border-[#0F5A47]/20 shadow-2xl shadow-[#0F5A47]/10 space-y-5">
+              {/* Top Brand Header */}
+              <div className="flex items-center justify-between border-b border-[#0F5A47]/15 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#0F5A47] to-[#059669] text-white flex items-center justify-center font-extrabold text-xl shadow-md">
+                    F
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-[#0F172A] text-base">Finora Operations Hub</h3>
+                    <p className="text-[10px] font-bold text-[#059669] uppercase tracking-wider">Automated Ledger V2.6</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-[#0F172A] text-base">Finora Operations Hub</h3>
-                  <p className="text-[10px] font-bold text-[#059669] uppercase tracking-wider">Automated Ledger V2.6</p>
+                <span className="px-3 py-1 rounded-full bg-[#059669]/10 text-[#059669] border border-[#059669]/25 text-[10px] font-extrabold uppercase tracking-wider">
+                  100% RECONCILED
+                </span>
+              </div>
+
+              {/* Feature Pills Row (In-flow, Zero Overlap) */}
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1.5 rounded-xl bg-[#0F5A47]/10 text-[#0F5A47] border border-[#0F5A47]/20 text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
+                  <Zap className="w-3.5 h-3.5 text-[#059669]" />
+                  Zero Manual Tally Entry
+                </span>
+                <span className="px-3 py-1.5 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F172A] text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
+                  <Shield className="w-3.5 h-3.5 text-[#0F5A47]" />
+                  Audit-Backed Waivers
+                </span>
+              </div>
+
+              {/* Live Metrics Grid */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="p-4 bg-[#F4F1EA] rounded-2xl border border-[#0F5A47]/15 space-y-1">
+                  <span className="text-[10px] font-extrabold text-[#475569] uppercase tracking-wider block">Today Collected</span>
+                  <p className="text-2xl font-extrabold text-[#0F172A]">₹1,84,500</p>
+                  <span className="text-[10px] font-extrabold text-[#059669] block">+18.4% vs last week</span>
+                </div>
+                <div className="p-4 bg-[#F4F1EA] rounded-2xl border border-[#0F5A47]/15 space-y-1">
+                  <span className="text-[10px] font-extrabold text-[#475569] uppercase tracking-wider block">Match Rate</span>
+                  <p className="text-2xl font-extrabold text-[#059669]">99.8%</p>
+                  <span className="text-[10px] font-extrabold text-[#059669] block">0ms Lag Sync</span>
                 </div>
               </div>
-              <span className="px-3 py-1 rounded-full bg-[#059669]/10 text-[#059669] border border-[#059669]/25 text-[10px] font-extrabold uppercase tracking-wider">
-                100% RECONCILED
-              </span>
-            </div>
 
-            {/* Feature Pills Row (In-flow, Zero Overlap) */}
-            <div className="flex flex-wrap gap-2">
-              <span className="px-3 py-1.5 rounded-xl bg-[#0F5A47]/10 text-[#0F5A47] border border-[#0F5A47]/20 text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
-                <Zap className="w-3.5 h-3.5 text-[#059669]" />
-                Zero Manual Tally Entry
-              </span>
-              <span className="px-3 py-1.5 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F172A] text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
-                <Shield className="w-3.5 h-3.5 text-[#0F5A47]" />
-                Audit-Backed Waivers
-              </span>
-            </div>
-
-            {/* Live Metrics Grid */}
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="p-4 bg-[#F4F1EA] rounded-2xl border border-[#0F5A47]/15 space-y-1">
-                <span className="text-[10px] font-extrabold text-[#475569] uppercase tracking-wider block">Today Collected</span>
-                <p className="text-2xl font-extrabold text-[#0F172A]">₹1,84,500</p>
-                <span className="text-[10px] font-extrabold text-[#059669] block">+18.4% vs last week</span>
-              </div>
-              <div className="p-4 bg-[#F4F1EA] rounded-2xl border border-[#0F5A47]/15 space-y-1">
-                <span className="text-[10px] font-extrabold text-[#475569] uppercase tracking-wider block">Match Rate</span>
-                <p className="text-2xl font-extrabold text-[#059669]">99.8%</p>
-                <span className="text-[10px] font-extrabold text-[#059669] block">0ms Lag Sync</span>
+              {/* Tally XML Export Bar */}
+              <div className="p-4 bg-[#0F5A47]/10 rounded-2xl border border-[#0F5A47]/20 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#0F5A47] animate-spin" />
+                  <span className="font-extrabold text-[#0F172A]">Tally Prime XML Export Ready</span>
+                </div>
+                <span className="px-2.5 py-1 rounded-lg bg-[#0F5A47] text-white font-extrabold text-[10px] uppercase tracking-wider shadow-xs">
+                  READY
+                </span>
               </div>
             </div>
-
-            {/* Tally XML Export Bar */}
-            <div className="p-4 bg-[#0F5A47]/10 rounded-2xl border border-[#0F5A47]/20 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#0F5A47] animate-spin" />
-                <span className="font-extrabold text-[#0F172A]">Tally Prime XML Export Ready</span>
-              </div>
-              <span className="px-2.5 py-1 rounded-lg bg-[#0F5A47] text-white font-extrabold text-[10px] uppercase tracking-wider shadow-xs">
-                READY
-              </span>
-            </div>
-          </div>
+          </TiltSpotlightCard>
         </motion.div>
       </div>
     </section>
@@ -235,10 +323,13 @@ function Hero() {
 function LiveTerminalShowcase() {
   const [activeTab, setActiveTab] = useState<"rec" | "tally" | "ai" | "soundbox" | "whatsapp" | "parent">("rec");
   const [soundLang, setSoundLang] = useState<"en" | "hi">("en");
+  const [isPlayingSound, setIsPlayingSound] = useState(false);
 
   const triggerSound = (lang: "en" | "hi") => {
     setSoundLang(lang);
+    setIsPlayingSound(true);
     playPaymentSoundbox(5000, "Rahul Sharma", "Class 5", lang);
+    setTimeout(() => setIsPlayingSound(false), 3500);
   };
 
   return (
@@ -410,9 +501,10 @@ function LiveTerminalShowcase() {
               <div className="space-y-5">
                 <div className="p-5 bg-[#0F5A47]/10 rounded-2xl border border-[#0F5A47]/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-[#0F5A47] font-extrabold text-sm">
+                    <div className="flex items-center gap-2.5 text-[#0F5A47] font-extrabold text-sm">
                       <Volume2 className="w-4 h-4 text-[#059669] animate-bounce" />
                       AI Audio Fee Soundbox Simulation
+                      <SoundEqualizer isPlaying={isPlayingSound} />
                     </div>
                     <p className="text-xs text-[#475569] font-medium">
                       Simulates real-time voice broadcasts in Hindi and English when a fee payment is recorded.

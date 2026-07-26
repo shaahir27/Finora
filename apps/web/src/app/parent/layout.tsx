@@ -125,58 +125,35 @@ function ParentLayoutInner({ children }: { children: ReactNode }) {
   return (
     <I18nProvider>
       <div className="min-h-dvh bg-bg-base flex flex-col md:flex-row overflow-hidden">
-        {/* Mobile Top Bar */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-[#EBE7DF] border-b border-[#0F5A47]/15 z-40 sticky top-0 shadow-xs">
-          <Link href="/parent/dues" className="flex items-center gap-2.5">
+        {/* Desktop Left Sidebar */}
+        <aside className="hidden md:flex w-64 flex-col bg-bg-surface border-r border-border-glass h-dvh sticky top-0">
+          <ParentSidebar />
+        </aside>
+
+        {/* Mobile Top Header */}
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#EBE7DF] border-b border-[#0F5A47]/15 sticky top-0 z-30 shadow-xs">
+          <Link href="/parent/cockpit" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-white bg-gradient-to-br from-[#0F5A47] to-[#0D7A5F] shadow-sm">
               ₹
             </div>
             <div>
               <h1 className="text-base font-extrabold text-text-primary tracking-tight">Finora</h1>
-              <p className="text-[9px] font-bold text-text-secondary uppercase tracking-wider">Parent Portal</p>
+              <p className="text-[9px] font-bold text-[#0F5A47] uppercase tracking-wider">Parent Portal</p>
             </div>
           </Link>
-          <button 
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="p-2 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F5A47] active:scale-95 transition-transform"
-            aria-label="Open navigation menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Mobile Overlay */}
-        {isMobileMenuOpen && (
-          <div 
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 md:hidden"
-            onClick={closeMenu}
-          />
-        )}
-
-        {/* Sidebar Navigation */}
-        <div className={`fixed inset-y-0 left-0 z-50 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition-transform duration-200 ease-in-out md:flex w-64 flex-col bg-bg-surface border-r border-border-glass h-dvh`}>
-          {/* Close button on mobile */}
-          <div className="md:hidden absolute top-3.5 right-3.5 z-50">
-            <button 
-              onClick={closeMenu}
-              className="p-1.5 rounded-lg bg-[#0F5A47]/10 text-[#0F5A47]"
-            >
-              <X className="w-5 h-5 text-text-primary" />
-            </button>
-          </div>
-          
-          <ParentSidebar closeMenu={closeMenu} />
-        </div>
+          <span className="px-2.5 py-1 rounded-full bg-[#0F5A47]/10 text-[#0F5A47] text-[10px] font-extrabold uppercase border border-[#0F5A47]/20">
+            Live Dues
+          </span>
+        </header>
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-auto min-h-[calc(100dvh-57px)] md:h-screen p-3.5 sm:p-6 md:p-8 relative pb-24 md:pb-8">
           {children}
         </main>
 
-        {/* Mobile Bottom Navigation Bar */}
+        {/* Pinned Mobile Bottom Navigation Bar */}
         <MobileBottomNav />
       </div>
     </I18nProvider>
   );
 }
-
