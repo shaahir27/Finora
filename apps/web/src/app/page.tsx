@@ -31,7 +31,133 @@ import {
   FileText as FileTax,
 } from "lucide-react";
 import { playPaymentSoundbox } from "@/lib/soundbox";
-import { buildWhatsAppPaymentUrl, buildSiblingBundledWhatsAppUrl } from "@/lib/whatsapp";
+import { buildWhatsAppPaymentUrl } from "@/lib/whatsapp";
+import confetti from "canvas-confetti";
+
+function fireConfetti() {
+  try {
+    confetti({
+      particleCount: 65,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ["#0F5A47", "#059669", "#10B981", "#34D399", "#F59E0B"],
+    });
+  } catch (e) {
+    // fallback if canvas not ready
+  }
+}
+
+function AmbientParticlesCanvas() {
+  useEffect(() => {
+    const canvas = document.getElementById("ambient-particles") as HTMLCanvasElement | null;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+    window.addEventListener("resize", handleResize);
+
+    const particles: Array<{ x: number; y: number; vx: number; vy: number; radius: number }> = [];
+    const count = Math.min(Math.floor(width / 35), 40);
+
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        radius: Math.random() * 2 + 1,
+      });
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        if (!p) continue;
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(15, 90, 71, 0.2)";
+        ctx.fill();
+
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          if (!p2) continue;
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 110) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(15, 90, 71, ${0.12 * (1 - dist / 110)})`;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  return <canvas id="ambient-particles" className="absolute inset-0 pointer-events-none z-0" />;
+}
+
+function InfiniteMarquee() {
+  const items = [
+    "⚡ 99.8% Automated Match Rate",
+    "📊 Tally Prime XML Export Ready",
+    "📢 Bilingual AI Voice Soundbox",
+    "📜 Section 80C Tax Cert Generator",
+    "🛡️ Smart 24h Reminder Muting",
+    "💳 Flexible Micro-Installments",
+    "🔐 Audit-Backed Ledger Waivers",
+  ];
+
+  return (
+    <div className="w-full bg-[#0F5A47] text-white py-3 overflow-hidden border-y border-[#0F5A47]/30 shadow-md relative z-20">
+      <motion.div
+        animate={{ x: ["0%", "-50%"] }}
+        transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+        className="flex whitespace-nowrap gap-12 text-xs font-extrabold tracking-wider uppercase"
+      >
+        {[...items, ...items].map((text, idx) => (
+          <span key={idx} className="flex items-center gap-3">
+            <span>{text}</span>
+            <span className="text-emerald-300">•</span>
+          </span>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
 
 // ─── Interactive 3D Mouse Tilt & Radial Spotlight Glow ──────────────────────────
 
@@ -191,6 +317,7 @@ function Navbar() {
 function Hero() {
   return (
     <section className="relative pt-36 pb-24 px-6 min-h-screen flex items-center overflow-hidden bg-[#F4F1EA]">
+      <AmbientParticlesCanvas />
       {/* Background Ambient Warm Sand Orbs */}
       <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-[#0F5A47]/10 rounded-full blur-[150px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[45vw] h-[45vw] bg-[#059669]/10 rounded-full blur-[150px] pointer-events-none"></div>
@@ -328,6 +455,7 @@ function LiveTerminalShowcase() {
   const triggerSound = (lang: "en" | "hi") => {
     setSoundLang(lang);
     setIsPlayingSound(true);
+    fireConfetti();
     playPaymentSoundbox(5000, "Rahul Sharma", "Class 5", lang);
     setTimeout(() => setIsPlayingSound(false), 3500);
   };
@@ -783,32 +911,6 @@ function Footer() {
   );
 }
 
-function FloatingJudgeDock() {
-  return (
-    <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-white/95 border border-[#0F5A47]/25 shadow-xl shadow-[#0F5A47]/15 backdrop-blur-2xl flex items-center gap-2.5 max-w-[92vw]">
-      <span className="text-[11px] font-extrabold text-[#0F172A] hidden sm:inline-flex items-center gap-1.5 pl-1">
-
-        <Sparkles className="w-3.5 h-3.5 text-[#059669] animate-spin" />
-        Quick Demo Launch:
-      </span>
-      <Link
-        href="/admin/dashboard"
-        className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-extrabold hover:opacity-95 active:scale-95 transition-all shadow-sm flex items-center gap-1.5"
-      >
-        <Shield className="w-3.5 h-3.5" />
-        Admin Console
-      </Link>
-      <Link
-        href="/parent/cockpit"
-        className="px-3.5 py-1.5 rounded-full bg-[#F4F1EA] text-[#0F172A] text-xs font-extrabold hover:bg-black/5 active:scale-95 transition-all border border-[#0F5A47]/20 flex items-center gap-1.5"
-      >
-        <Smartphone className="w-3.5 h-3.5 text-[#0F5A47]" />
-        Parent Portal
-      </Link>
-    </div>
-  );
-}
-
 // ─── Main Landing Page ────────────────────────────────────────────────────────
 
 export default function HomePage() {
@@ -826,6 +928,7 @@ export default function HomePage() {
 
       <main className="relative z-10">
         <Hero />
+        <InfiniteMarquee />
         <LiveTerminalShowcase />
         <FlagshipInnovations />
         <ImpactMetrics />
@@ -833,7 +936,6 @@ export default function HomePage() {
       </main>
 
       <Footer />
-      <FloatingJudgeDock />
     </div>
   );
 }
