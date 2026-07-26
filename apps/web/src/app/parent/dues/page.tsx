@@ -70,14 +70,14 @@ export default function ParentDuesPage() {
 
     // Cache parentLinkId and schoolId for Copilot
     if (!sessionStorage.getItem("finora_parent_link_id")) {
-      getParentLinkId(parentUserId)
+      getParentLinkId()
         .then((id) => {
           if (id) sessionStorage.setItem("finora_parent_link_id", id);
         })
         .catch(console.error);
     }
     if (!sessionStorage.getItem("finora_school_id")) {
-      getParentSchoolId(parentUserId)
+      getParentSchoolId()
         .then((id) => {
           if (id) sessionStorage.setItem("finora_school_id", id);
         })
@@ -85,8 +85,8 @@ export default function ParentDuesPage() {
     }
 
     Promise.all([
-      getMyChildren(parentUserId),
-      getMyChildrenDues(parentUserId),
+      getMyChildren(),
+      getMyChildrenDues(),
     ])
       .then(([kids, duesData]) => {
         setChildrenList(kids);
@@ -131,8 +131,6 @@ export default function ParentDuesPage() {
   }, [displayedDues]);
 
   const handleGenerate80C = async () => {
-    const parentUserId = session?.user?.id;
-    if (!parentUserId) return;
     try {
       setTaxLoading(true);
       const targetStudentId =
@@ -146,7 +144,6 @@ export default function ParentDuesPage() {
       }
 
       const res = await generate80CTaxCertificateAction(
-        parentUserId,
         targetStudentId,
         "2025-2026"
       );
@@ -256,10 +253,10 @@ export default function ParentDuesPage() {
 
       {/* Child Switcher Header Segmented Toggle */}
       {childrenList.length > 0 && (
-        <div className="p-1.5 bg-[#EBE7DF] rounded-2xl flex overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap gap-1.5 border border-[#0F5A47]/15">
+        <div className="p-1.5 bg-[#EBE7DF] rounded-2xl flex overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap gap-1.5 border border-[#0F5A47]/15 max-w-full">
           <button
             onClick={() => setSelectedStudentId("ALL")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all min-h-[44px] whitespace-nowrap ${
               selectedStudentId === "ALL"
                 ? "bg-[#0F5A47] text-white shadow-md shadow-[#0F5A47]/20"
                 : "text-text-secondary hover:text-text-primary hover:bg-white/50"
@@ -272,7 +269,7 @@ export default function ParentDuesPage() {
             <button
               key={kid.id}
               onClick={() => setSelectedStudentId(kid.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all min-h-[44px] whitespace-nowrap ${
                 selectedStudentId === kid.id
                   ? "bg-[#0F5A47] text-[#FFFFFF] shadow-md shadow-[#0F5A47]/20"
                   : "text-text-secondary hover:text-text-primary hover:bg-white/50"
@@ -481,7 +478,7 @@ export default function ParentDuesPage() {
       {/* Section 80C Tax Exemption Modal */}
       {showTaxModal && taxCertificateData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <GlassCard className="w-full max-w-lg bg-[#F4F1EA] p-6 border-border-glass shadow-2xl space-y-4">
+          <GlassCard className="w-full max-w-lg bg-[#F4F1EA] p-6 border-border-glass shadow-2xl space-y-4 mobile-bottom-sheet">
             <div className="flex justify-between items-center border-b border-border-glass pb-3">
               <div className="flex items-center gap-2 text-[#0F5A47]">
                 <FileText className="w-5 h-5" />
@@ -548,7 +545,7 @@ export default function ParentDuesPage() {
       {/* GST & SAC 9992 Explanation Modal */}
       {showGstModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <GlassCard className="w-full max-w-lg bg-[#F4F1EA] p-6 border-border-glass shadow-2xl space-y-4">
+          <GlassCard className="w-full max-w-lg bg-[#F4F1EA] p-6 border-border-glass shadow-2xl space-y-4 mobile-bottom-sheet">
             <div className="flex justify-between items-center border-b border-border-glass pb-3">
               <div className="flex items-center gap-2 text-[#0F5A47]">
                 <Info className="w-5 h-5" />
@@ -595,7 +592,7 @@ export default function ParentDuesPage() {
       {/* Interactive Installment Plan Simulator Modal */}
       {showInstallmentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <GlassCard className="w-full max-w-lg bg-[#F4F1EA] p-6 border-border-glass shadow-2xl space-y-5">
+          <GlassCard className="w-full max-w-lg bg-[#F4F1EA] p-6 border-border-glass shadow-2xl space-y-5 mobile-bottom-sheet">
             <div className="flex justify-between items-center border-b border-border-glass pb-3">
               <div className="flex items-center gap-2 text-[#0F5A47]">
                 <CreditCard className="w-5 h-5" />

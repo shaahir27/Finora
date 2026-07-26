@@ -23,14 +23,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyRazorpayWebhookSignature } from "@smart-school/payments";
-import { recordPayment } from "@/app/actions/ledger";
+import { recordPaymentFromWebhook } from "@/app/actions/ledger";
 
-// School/admin context for webhook-originated payments.
-// In production these would be resolved from the order's metadata.
-// For the sandbox demo, a single school and system admin ID is used —
-// matching the same pattern as handleRazorpayWebhook in api_specification.md.
+// School context for webhook-originated payments.
 const WEBHOOK_SCHOOL_ID = process.env.NEXT_PUBLIC_DEMO_SCHOOL_ID ?? "demo-school-id";
-const WEBHOOK_ADMIN_ID = "razorpay-webhook-system";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. Read raw body — MUST happen before any JSON.parse.
@@ -81,10 +77,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Missing fee_assignment_id in notes" }, { status: 200 });
   }
 
-  // 5. Post the payment through the canonical recordPayment path.
-  //    Idempotency: recordPayment checks for existing ref_number before inserting.
+  // 5. Post the payment through recordPaymentFromWebhook path.
+  //    Idempotency: recordPaymentFromWebhook checks for existing ref_number before inserting.
   try {
-    const result = await recordPayment(WEBHOOK_ADMIN_ID, WEBHOOK_SCHOOL_ID, {
+    const result = await recordPaymentFromWebhook(WEBHOOK_SCHOOL_ID, {
       feeAssignmentId,
       channel: "upi",
       amount: verifyResult.paymentData.amountRupees,

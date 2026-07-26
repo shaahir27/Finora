@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { getMyPaymentHistory, getMyChildrenDues } from "@/app/actions/parents";
-import { generateReceipt } from "@/app/actions/receipts";
+import { generateReceipt, generate80CTaxCertificateAction } from "@/app/actions/receipts";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useDataState } from "@/lib/useDataState";
@@ -22,7 +22,7 @@ export default function ParentHistoryPage() {
   const dataState = useDataState({
     queryKey: ["parentHistory", parentUserId],
     queryFn: async () => {
-      const historyData = await getMyPaymentHistory(parentUserId);
+      const historyData = await getMyPaymentHistory();
       return {
         students: historyData.students || [],
         transactions: historyData.transactions || [],
@@ -38,6 +38,17 @@ export default function ParentHistoryPage() {
       toast.success(`Generated ${receiptFormat.toUpperCase()} Receipt PDF`);
     } catch (e: any) {
       toast.error(`Error generating receipt: ${e.message}`);
+    }
+  };
+
+  const handleDownload80C = async (studentId?: string) => {
+    try {
+      const targetId = studentId || (dataState.state === "synced" ? dataState.data.students[0]?.id : undefined);
+      if (!targetId) throw new Error("No linked student found.");
+      const res = await generate80CTaxCertificateAction(targetId, "2025-26");
+      toast.success(`Section 80C Certificate (FY ${res.financialYear}): ₹${res.totalTuitionFeePaid.toLocaleString("en-IN")} Pure Tuition Fee Claimable`);
+    } catch (e: any) {
+      toast.error(`Tax Certificate Error: ${e.message}`);
     }
   };
 
@@ -88,17 +99,29 @@ export default function ParentHistoryPage() {
           </p>
         </div>
 
-        {/* Receipt Format Preference */}
-        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-[#0F5A47]/20 text-xs shadow-sm">
-          <span className="font-bold text-text-secondary">Receipt Format:</span>
-          <select
-            value={receiptFormat}
-            onChange={(e) => setReceiptFormat(e.target.value as any)}
-            className="bg-transparent font-bold text-[#0F5A47] focus:outline-none"
+        {/* Controls Bar */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={() => handleDownload80C()}
+            className="px-3 py-1.5 rounded-xl bg-[#0F5A47] hover:bg-[#093C2F] text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
           >
-            <option value="a4">Standard A4 PDF</option>
-            <option value="thermal">Thermal POS Receipt</option>
-          </select>
+            <Download className="w-3.5 h-3.5" />
+            <span>Section 80C Tax Cert (FY 2025-26)</span>
+          </button>
+
+          {/* Receipt Format Preference */}
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-[#0F5A47]/20 text-xs shadow-sm">
+            <span className="font-bold text-text-secondary">Format:</span>
+            <select
+              value={receiptFormat}
+              onChange={(e) => setReceiptFormat(e.target.value as any)}
+              className="bg-transparent font-bold text-[#0F5A47] focus:outline-none"
+            >
+              <option value="a4">Standard A4 PDF</option>
+              <option value="thermal">Thermal POS Receipt</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -142,7 +165,7 @@ export default function ParentHistoryPage() {
                 </div>
               )}
 
-              {/* Transactions Table Card */}
+              {/* Transactions Ledger Container */}
               <GlassCard className="p-0 overflow-hidden border-[#0F5A47]/15">
                 {displayedTransactions.length === 0 ? (
                   <div className="p-12 text-center">
@@ -151,60 +174,98 @@ export default function ParentHistoryPage() {
                     <p className="text-xs text-text-secondary mt-1">Payments recorded via UPI, Cash, or Cheque will appear here.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="text-[11px] uppercase font-bold text-text-secondary bg-[#EBE7DF]/60 border-b border-border-glass">
-                        <tr>
-                          <th className="px-6 py-3.5">Date</th>
-                          <th className="px-6 py-3.5">Student</th>
-                          <th className="px-6 py-3.5">Fee Item</th>
-                          <th className="px-6 py-3.5">Channel</th>
-                          <th className="px-6 py-3.5 text-right">Amount</th>
-                          <th className="px-6 py-3.5 text-center">Status</th>
-                          <th className="px-6 py-3.5 text-right">Official Receipt</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-glass bg-white/60">
-                        {displayedTransactions.map((tx: any) => (
-                          <tr key={tx.id} className="hover:bg-[#0F5A47]/5 transition-colors">
-                            <td className="px-6 py-4 font-semibold text-text-primary whitespace-nowrap">
-                              {new Date(tx.postedAt).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })}
-                            </td>
-                            <td className="px-6 py-4 font-bold text-text-primary">
-                              {tx.studentName}
-                            </td>
-                            <td className="px-6 py-4 font-medium text-text-primary">
-                              {tx.feeType}
-                            </td>
-                            <td className="px-6 py-4 uppercase font-bold text-[#0F5A47] tracking-wider text-[10px]">
-                              {tx.channel}
-                            </td>
-                            <td className="px-6 py-4 text-right font-extrabold text-base text-[#0F172A]">
-                              ₹{Number(tx.amount).toLocaleString("en-IN")}
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              {getStatusBadge(tx.status)}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              {tx.status === "posted" && (
-                                <button
-                                  onClick={() => handleDownload(tx.id)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F5A47] font-bold text-xs hover:bg-[#0F5A47]/10 transition-all shadow-sm"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                  Receipt PDF
-                                </button>
-                              )}
-                            </td>
+                  <>
+                    {/* Mobile View (< 640px): Touch-Friendly Stack Cards */}
+                    <div className="block sm:hidden divide-y divide-border-glass bg-white/60">
+                      {displayedTransactions.map((tx: any) => (
+                        <div key={tx.id} className="p-4 space-y-3 hover:bg-[#0F5A47]/5 transition-colors">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-xs font-extrabold text-text-primary">{tx.feeType}</p>
+                              <p className="text-[11px] font-semibold text-text-secondary mt-0.5">
+                                {tx.studentName} • {new Date(tx.postedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-base font-extrabold text-[#0F172A]">₹{Number(tx.amount).toLocaleString("en-IN")}</p>
+                              <span className="inline-block uppercase font-bold text-[#0F5A47] tracking-wider text-[9px] mt-0.5">
+                                {tx.channel}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1">
+                            <div>{getStatusBadge(tx.status)}</div>
+                            {tx.status === "posted" && (
+                              <button
+                                onClick={() => handleDownload(tx.id)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F5A47] font-bold text-xs hover:bg-[#0F5A47]/10 active:scale-95 transition-all shadow-xs min-h-[36px]"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                Receipt PDF
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop View (≥ 640px): Structured Data Table */}
+                    <div className="hidden sm:block overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="text-[11px] uppercase font-bold text-text-secondary bg-[#EBE7DF]/60 border-b border-border-glass">
+                          <tr>
+                            <th className="px-6 py-3.5">Date</th>
+                            <th className="px-6 py-3.5">Student</th>
+                            <th className="px-6 py-3.5">Fee Item</th>
+                            <th className="px-6 py-3.5">Channel</th>
+                            <th className="px-6 py-3.5 text-right">Amount</th>
+                            <th className="px-6 py-3.5 text-center">Status</th>
+                            <th className="px-6 py-3.5 text-right">Official Receipt</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-border-glass bg-white/60">
+                          {displayedTransactions.map((tx: any) => (
+                            <tr key={tx.id} className="hover:bg-[#0F5A47]/5 transition-colors">
+                              <td className="px-6 py-4 font-semibold text-text-primary whitespace-nowrap">
+                                {new Date(tx.postedAt).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </td>
+                              <td className="px-6 py-4 font-bold text-text-primary">
+                                {tx.studentName}
+                              </td>
+                              <td className="px-6 py-4 font-medium text-text-primary">
+                                {tx.feeType}
+                              </td>
+                              <td className="px-6 py-4 uppercase font-bold text-[#0F5A47] tracking-wider text-[10px]">
+                                {tx.channel}
+                              </td>
+                              <td className="px-6 py-4 text-right font-extrabold text-base text-[#0F172A]">
+                                ₹{Number(tx.amount).toLocaleString("en-IN")}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                {getStatusBadge(tx.status)}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                {tx.status === "posted" && (
+                                  <button
+                                    onClick={() => handleDownload(tx.id)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F5A47] font-bold text-xs hover:bg-[#0F5A47]/10 transition-all shadow-sm"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    Receipt PDF
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </GlassCard>
             </div>

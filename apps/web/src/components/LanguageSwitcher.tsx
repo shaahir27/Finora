@@ -63,7 +63,7 @@ export function LanguageSwitcher() {
         className="px-3 py-1.5 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F172A] text-xs font-extrabold hover:bg-[#0F5A47]/10 transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap"
       >
         <Globe className="w-3.5 h-3.5 text-[#0F5A47] flex-shrink-0" />
-        <span>{activeLang.script}</span>
+        <span>{activeLang?.script}</span>
       </button>
 
       {isOpen && (

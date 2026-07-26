@@ -21,6 +21,8 @@ import {
 const DEMO_EMAIL = "admin@school.edu";
 const DEMO_PASSWORD = "demo1234";
 
+const showDemoAids = process.env.NODE_ENV !== "production";
+
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,7 +52,7 @@ export default function AdminLoginPage() {
     });
 
     if (result?.error) {
-      setError("Invalid email or password. Use admin@school.edu / demo1234");
+      setError(showDemoAids ? "Invalid email or password. Use admin@school.edu / demo1234" : "Invalid email or password.");
       setIsLoading(false);
     } else {
       router.replace("/admin/dashboard");
@@ -125,14 +127,16 @@ export default function AdminLoginPage() {
             </div>
 
             {/* Quick Demo Fill Button */}
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="w-full py-2.5 px-4 rounded-2xl bg-[#0F5A47]/10 hover:bg-[#0F5A47]/20 border border-[#0F5A47]/25 text-[#0F5A47] text-xs font-extrabold transition-all flex items-center justify-center gap-2 shadow-xs"
-            >
-              <Sparkles className="w-4 h-4 text-[#0F5A47]" />
-              Auto-Fill Demo Admin Credentials
-            </button>
+            {showDemoAids && (
+              <button
+                type="button"
+                onClick={handleFillDemo}
+                className="w-full py-2.5 px-4 rounded-2xl bg-[#0F5A47]/10 hover:bg-[#0F5A47]/20 border border-[#0F5A47]/25 text-[#0F5A47] text-xs font-extrabold transition-all flex items-center justify-center gap-2 shadow-xs"
+              >
+                <Sparkles className="w-4 h-4 text-[#0F5A47]" />
+                Auto-Fill Demo Admin Credentials
+              </button>
+            )}
 
             <form id={formId} onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">

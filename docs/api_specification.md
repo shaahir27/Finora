@@ -54,12 +54,17 @@ Action-level contracts grouped by module. Does not restate business logic detail
 ## Ledger Engine (`packages/payments` + `packages/db`)
 
 **`recordPayment({ feeAssignmentId, channel, amount, refNumber? })`**
-- `channel ∈ { upi, cash, cheque }`.
+- `channel ∈ { upi, cash, cheque }`. Requires active admin session (`requireAdminForSchool`).
 - Acquires a row-level lock (`SELECT ... FOR UPDATE`) on the target `FEE_ASSIGNMENT` as the first step inside its database transaction — added Phase 8, see `financial_engine.md` §1 Concurrency for the race this prevents. Every other step below happens after the lock is held.
 - Validates `amount > 0` and `amount ≤ remaining balance` (rejects overpayment, does not cap silently) — this check reads the balance *after* the lock above, not a pre-lock cached value.
 - For `channel: upi`: checks for an existing `TRANSACTION` with the same `ref_number` before insert (idempotency — see `system_architecture.md`); returns the existing record if found.
-- Writes `TRANSACTION`, updates `FEE_ASSIGNMENT.amount_paid`/`payment_status` in the same DB transaction, runs `detectAnomaly` synchronously. See full algorithm in `business_rules.md` §2.
+- Writes `TRANSACTION`, updates `FEE_ASSIGNMENT.amount_paid`/`payment_status` in the same DB transaction, runs `detectAnomaly` (`round2` floating-point safe) synchronously. See full algorithm in `business_rules.md` §2.
 - Returns the created (or matched) `TRANSACTION` plus updated `FEE_ASSIGNMENT` state.
+- **`recordPaymentFromWebhook(schoolId, data)`**: Webhook entry point authorized by Razorpay HMAC signature verification.
+- **`recordPaymentFromSandbox(schoolId, data)`**: Parent sandbox payment simulation entry point.
+
+**`resolveAnomaly(transactionId, resolution, notes?)`**
+- Resolves a flagged anomaly transaction as either `posted` or `reversed`. Requires admin session matching `transaction.schoolId`. Writes an `AUDIT_LOG` row (`action: anomaly_resolved`).
 
 **`getLedgerSnapshot(schoolId, filters?, pagination?)`**
 - Powers the real-time dashboard. Reads Postgres directly — no cache layer, since staleness is the exact problem this product solves.
@@ -84,6 +89,20 @@ Action-level contracts grouped by module. Does not restate business logic detail
 **`reconcileMissedUpiPayment(razorpayOrderId)`** *(added Phase 8 — closes the previously-named-but-unaddressed "webhook never arrives" gap, see `system_architecture.md`)*
 - Manual, explicitly-triggered admin action — **not** automatic polling, which remains a Future Extension. Looks up the order directly against the Razorpay sandbox API; if a successful payment exists there but no matching `TRANSACTION` row exists locally (checked by `ref_number`), posts it through the same `recordPayment` path used by the webhook, preserving idempotency.
 - Exists specifically so an admin who notices "Razorpay shows paid, the ledger doesn't" — the one failure mode most likely to visibly surface during a live demo — has a documented recovery step rather than no path forward at all.
+
+---
+
+## Tax & Utility Services *(added Phase 16)*
+
+**`generate80CTaxCertificateAction(studentId, financialYear)`**
+- Calculates pure tuition fee transactions paid by the student for the specified financial year (e.g. `2025-26`), excluding non-tuition categories (transport, sports, hostelling).
+- Derived directly from `requireParentSession()` context with `guardianOf` student-link verification to prevent IDOR vulnerabilities.
+
+**`playPaymentSoundbox(amount, studentName, classInfo?, language?)`** *(client utility — `apps/web/src/lib/soundbox.ts`)*
+- Invokes browser native `SpeechSynthesis` API (`window.speechSynthesis`) to provide bilingual (Hindi/English) voice confirmation when payments or cheque clearances are posted at the admin desk. 0 API keys required.
+
+**`buildWhatsAppPaymentUrl(params)`** *(client utility — `apps/web/src/lib/whatsapp.ts`)*
+- Generates 1-tap WhatsApp Universal payment link (`https://wa.me/...`) with pre-filled student details and UPI checkout URL. 0 API keys required.
 
 ---
 

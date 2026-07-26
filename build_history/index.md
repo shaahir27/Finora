@@ -39,5 +39,9 @@ Map of every feature built, where its log lives, and its current status. Updated
 | Audit Report Section B Fixes | Session 6 | `session_06_polish_and_demo/feature_audit_report_section_b.md` | Built | 2026-07-26 |
 | UI/UX Overhaul & 3 Workspaces | Session 6 | `session_06_polish_and_demo/feature_ui_ux_overhaul_3_workspaces.md` | Built | 2026-07-26 |
 | Admin Portal Overhaul & Finance Ops | Session 6 | `session_06_polish_and_demo/feature_admin_portal_overhaul.md` | Built | 2026-07-26 |
+| Mobile App Layout & Responsiveness | Session 6 | `session_06_polish_and_demo/feature_mobile_app_responsiveness.md` | Built | 2026-07-26 |
+| Admin Dashboard Mobile & Ngrok Fix | Session 6 | `session_06_polish_and_demo/feature_admin_dashboard_mobile_and_ngrok_fix.md` | Built | 2026-07-26 |
+| Complete Audit Report Rectification | Session 6 | `session_06_polish_and_demo/feature_audit_rectification_complete.md` | Built | 2026-07-26 |
+| Soundbox, Tax Cert & WhatsApp Utilities | Session 6 | `session_06_polish_and_demo/feature_soundbox_tax_whatsapp_innovations.md` | Built | 2026-07-26 |
 
 **Status legend**: `Built` (complete, checkpoint passed) · `Updated` (built earlier, revised in a later session — see the file's own history for what changed) · `Deferred` (started, intentionally incomplete — reason is in the feature's own Section 6, not just here).

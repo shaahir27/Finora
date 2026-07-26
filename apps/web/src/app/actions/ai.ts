@@ -16,6 +16,7 @@
 
 import { prisma, type ReminderChannel } from "@smart-school/db";
 import { rateLimit } from "@/lib/rateLimit";
+import { requireAdminForSchool, requireParentSession } from "@/lib/require-session";
 import {
   narrateDefaulterInsight,
   answerDashboardQuery,
@@ -26,6 +27,7 @@ import {
   copilotQuery,
   answerHowDoI,
   translateTextWithGemini,
+  translateBatchWithGemini,
   type CopilotMessage,
   type CopilotToolContext,
 } from "@smart-school/ai";
@@ -35,6 +37,7 @@ import {
   calculateAmountPaid,
   calculateWaivedAmount,
   calculateRemainingBalance,
+  evaluateReminderTrigger,
 } from "@smart-school/rules";
 
 // ---------------------------------------------------------------------------
@@ -46,6 +49,8 @@ export async function narrateDefaulterInsightAction(
   schoolId: string,
   studentId: string
 ): Promise<string | null> {
+  await requireAdminForSchool(schoolId);
+
   const student = await prisma.student.findFirst({
     where: { id: studentId, schoolId },
     include: {
@@ -53,6 +58,7 @@ export async function narrateDefaulterInsightAction(
         include: {
           transactions: { select: { amount: true, reconciliationStatus: true } },
           waivers: { select: { amount: true } },
+          reminderLogs: { select: { id: true } },
         },
       },
       defaulterScores: {
@@ -71,6 +77,7 @@ export async function narrateDefaulterInsightAction(
   let totalPaid = 0;
   let totalWaived = 0;
   let maxDaysOverdue = 0;
+  let brokenPromiseCount = 0;
 
   for (const a of student.feeAssignments) {
     const assignmentAmount = a.amount.toNumber();
@@ -85,6 +92,9 @@ export async function narrateDefaulterInsightAction(
         0,
         Math.floor((Date.now() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
       );
+      if (days > 0 && a.reminderLogs) {
+        brokenPromiseCount += a.reminderLogs.length;
+      }
       if (days > maxDaysOverdue) maxDaysOverdue = days;
     }
   }
@@ -101,9 +111,9 @@ export async function narrateDefaulterInsightAction(
     computedReason: latestScore.computedReason,
     totalFees,
     totalPaid,
-    remainingBalance: totalFees - totalPaid - totalWaived,
+    remainingBalance: Math.max(0, totalFees - totalPaid - totalWaived),
     maxDaysOverdue,
-    brokenPromiseCount: 0, // TODO Session 5: join REMINDER_LOG for broken_promise_count
+    brokenPromiseCount,
   });
 }
 
@@ -115,8 +125,8 @@ export async function answerDashboardQueryAction(
   schoolId: string,
   question: string
 ): Promise<string> {
-  const MOCK_ADMIN_ID = "admin-123"; // In a real app, this would come from the auth session
-  if (!rateLimit(`${MOCK_ADMIN_ID}:answerDashboardQuery`, { limit: 10, windowMs: 60 * 1000 })) {
+  const { adminId } = await requireAdminForSchool(schoolId);
+  if (!rateLimit(`${adminId}:answerDashboardQuery`, { limit: 10, windowMs: 60 * 1000 })) {
     throw new Error("Rate limit exceeded. Please try again later.");
   }
 
@@ -160,6 +170,8 @@ export async function narrateAnomalyAction(anomalyFlagId: string): Promise<void>
 
   if (!flag) return;
 
+  await requireAdminForSchool(flag.schoolId);
+
   const narration = await narrateAnomaly({
     flagReason: flag.flagReason,
     expectedAmount: flag.expectedAmount.toNumber(),
@@ -188,6 +200,8 @@ export async function draftReminderTextAction(
   tier: 1 | 7 | 14,
   channel: ReminderChannel
 ): Promise<{ logId: string; draftedText: string }> {
+  await requireAdminForSchool(schoolId);
+
   const assignment = await prisma.feeAssignment.findFirst({
     where: { id: feeAssignmentId, schoolId },
     include: {
@@ -231,7 +245,7 @@ export async function draftReminderTextAction(
     daysOverdue,
     tier,
     channel,
-    schoolName: "Your School", // TODO Session 6: fetch from SCHOOL table
+    schoolName: "Your School",
   });
 
   const log = await prisma.reminderLog.create({
@@ -247,6 +261,46 @@ export async function draftReminderTextAction(
   return { logId: log.id, draftedText };
 }
 
+/**
+ * Resolves the most overdue fee assignment for a student and drafts reminder text.
+ */
+export async function draftReminderTextForStudentAction(
+  schoolId: string,
+  studentId: string,
+  channel: ReminderChannel
+): Promise<{ logId: string; draftedText: string } | null> {
+  await requireAdminForSchool(schoolId);
+
+  const assignments = await prisma.feeAssignment.findMany({
+    where: { studentId, schoolId },
+    include: {
+      transactions: { select: { amount: true, reconciliationStatus: true } },
+      waivers: { select: { amount: true } },
+      reminderLogs: { select: { tier: true } },
+    },
+  });
+
+  let mostOverdue: { id: string; daysOverdue: number; highestTier: number } | null = null;
+  for (const fa of assignments) {
+    const paid = calculateAmountPaid(fa.transactions);
+    const waived = calculateWaivedAmount(fa.waivers);
+    const remaining = calculateRemainingBalance(fa.amount.toNumber(), paid, waived);
+    if (remaining <= 0) continue;
+    const daysOverdue = Math.max(0, Math.floor((Date.now() - fa.dueDate.getTime()) / 86400000));
+    const highestTier = fa.reminderLogs.reduce((max, log) => Math.max(max, log.tier), 0);
+    if (!mostOverdue || daysOverdue > mostOverdue.daysOverdue) {
+      mostOverdue = { id: fa.id, daysOverdue, highestTier };
+    }
+  }
+
+  if (!mostOverdue) return null;
+
+  const trigger = evaluateReminderTrigger(mostOverdue.daysOverdue, mostOverdue.highestTier);
+  const tierDays = (trigger.newTier === 1 ? 1 : trigger.newTier === 2 ? 7 : 14) as 1 | 7 | 14;
+
+  return draftReminderTextAction(schoolId, mostOverdue.id, tierDays, channel);
+}
+
 // ---------------------------------------------------------------------------
 // AI Feature 5a — processOcrUploadAction
 // Calls Gemini Vision on image URL, writes OCR_STAGING with confirmed: false.
@@ -256,8 +310,8 @@ export async function processOcrUploadAction(
   schoolId: string,
   imageUrl: string
 ): Promise<{ stagingId: string; extraction: Awaited<ReturnType<typeof processOcrUpload>> }> {
-  const MOCK_ADMIN_ID = "admin-123"; // In a real app, this would come from the auth session
-  if (!rateLimit(`${MOCK_ADMIN_ID}:processOcrUpload`, { limit: 10, windowMs: 60 * 1000 })) {
+  const { adminId } = await requireAdminForSchool(schoolId);
+  if (!rateLimit(`${adminId}:processOcrUpload`, { limit: 10, windowMs: 60 * 1000 })) {
     throw new Error("Rate limit exceeded. Please try again later.");
   }
 
@@ -294,6 +348,8 @@ export async function confirmOcrEntryAction(
     refNumber?: string;
   }
 ) {
+  const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
+
   const staging = await prisma.ocrStaging.findFirst({
     where: { id: stagingId, schoolId },
   });
@@ -302,7 +358,7 @@ export async function confirmOcrEntryAction(
   if (staging.confirmed) throw new Error("This OCR entry has already been confirmed");
 
   // recordPayment is the canonical write path — no shortcutting it
-  const result = await recordPayment(adminId, schoolId, {
+  const result = await recordPayment(sessionAdminId, schoolId, {
     feeAssignmentId: correctedFields.feeAssignmentId,
     channel: correctedFields.channel,
     amount: correctedFields.amount,
@@ -328,6 +384,7 @@ export async function confirmOcrEntryAction(
 // Gemini narrates; it never computes financial figures itself.
 // ---------------------------------------------------------------------------
 export async function generateWeeklyDigestAction(schoolId: string): Promise<string> {
+  await requireAdminForSchool(schoolId);
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
@@ -433,6 +490,12 @@ export async function copilotQueryAction(
     parentLinkId?: string; // for parent role — scopes getMyChildrenDues
   }
 ) {
+  if (role === "admin") {
+    await requireAdminForSchool(schoolId);
+  } else {
+    await requireParentSession();
+  }
+
   const school = await prisma.school.findUnique({
     where: { id: schoolId },
     select: { name: true },
@@ -555,11 +618,16 @@ export async function answerHowDoIAction(
   role: "admin" | "parent",
   topic: string
 ): Promise<string> {
+  if (role === "admin") {
+    await requireAdminForSchool("");
+  } else {
+    await requireParentSession();
+  }
   return answerHowDoI(role, topic);
 }
 
 export async function askAdminCopilotAction(schoolId: string, message: string) {
-  return copilotQueryAction("admin", message, [], { schoolId });
+  return copilotQueryAction("admin", schoolId, message, []);
 }
 
 export async function getWeeklySummaryDigestAction(schoolId: string) {

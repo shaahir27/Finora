@@ -185,13 +185,12 @@ export async function resolveSyncConflict(
   if (conflict.resolved) throw new Error("Conflict is already resolved.");
 
   const { adminId: sessionAdminId } = await requireAdminForSchool(conflict.schoolId);
-  const effectiveAdmin = sessionAdminId || adminId;
 
   await prisma.offlineSyncConflict.update({
     where: { id: conflictId },
     data: {
       resolved: true,
-      resolvedById: adminId,
+      resolvedById: sessionAdminId,
       resolvedAt: new Date(),
       resolutionAction,
     },
@@ -200,7 +199,7 @@ export async function resolveSyncConflict(
   // Audit log — resolving a conflict is as audit-worthy as a waiver or penalty.
   await prisma.auditLog.create({
     data: {
-      actorId: adminId,
+      actorId: sessionAdminId,
       action: "sync_conflict_resolved",
       beforeState: {
         conflictId,

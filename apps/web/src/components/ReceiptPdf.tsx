@@ -437,7 +437,7 @@ export const ReceiptPdf = ({
 }: ReceiptProps) => {
   const computedBase = baseAmount ?? amount - gstAmount;
   const isGstApplicable = gstAmount > 0 && gstRate != null;
-  const channelLabel = channel.toUpperCase().replace(/_/g, " ");
+  const channelLabel = (channel || "CASH").toUpperCase().replace(/_/g, " ");
   const formattedAmount = `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
   // ── 80mm Thermal Receipt Rendering ──

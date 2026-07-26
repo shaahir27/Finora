@@ -18,6 +18,7 @@ import {
   calculateWaivedAmount,
   calculateRemainingBalance,
 } from "@smart-school/rules";
+import { requireAdminForSchool } from "@/lib/require-session";
 
 export interface ReminderQueueItem {
   id: string;
@@ -47,6 +48,8 @@ export async function getRemindersQueue(
   schoolId: string,
   options?: { status?: ReminderStatus; limit?: number; cursor?: string }
 ): Promise<{ reminders: ReminderQueueItem[]; nextCursor: string | undefined }> {
+  await requireAdminForSchool(schoolId);
+
   const limit = options?.limit ?? 50;
 
   const logs = await prisma.reminderLog.findMany({
@@ -144,6 +147,10 @@ export async function markReminderSent(reminderLogId: string): Promise<{ status:
   });
   
   if (!log) throw new Error("Reminder log not found");
+
+  if (log.feeAssignment?.schoolId) {
+    await requireAdminForSchool(log.feeAssignment.schoolId);
+  }
 
   if (log.status !== "logged") {
     throw new Error(`Reminder is already in status '${log.status}' — cannot mark as sent.`);

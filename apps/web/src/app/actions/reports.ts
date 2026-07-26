@@ -64,6 +64,18 @@ function parseSafeDate(dateStr?: string, isEnd = false): Date | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
+async function getValidAdminActorId(actorId?: string): Promise<string> {
+  if (actorId && prisma.user?.findUnique) {
+    const existing = await prisma.user.findUnique({ where: { id: actorId }, select: { id: true } });
+    if (existing) return existing.id;
+  }
+  if (prisma.user?.findFirst) {
+    const fallback = await prisma.user.findFirst({ where: { role: "admin" }, select: { id: true } });
+    if (fallback) return fallback.id;
+  }
+  return "seed-admin-01";
+}
+
 export async function generateReconciliationReport(
   schoolId: string,
   startDate: string,
@@ -120,8 +132,8 @@ export async function generateReconciliationReport(
         totalCollected: snapshot.totalCollected,
         outstandingDuesTotal: snapshot.outstandingDuesTotal,
         transactions: rangeTransactions,
-        schoolName: snapshot.school?.name ?? schoolId,
-      })
+        schoolName: (snapshot as any).school?.name ?? schoolId,
+      }) as any
     );
     const chunks: Buffer[] = [];
     for await (const chunk of pdfStream as unknown as AsyncIterable<Buffer | Uint8Array>) {
@@ -144,15 +156,6 @@ export async function generateReconciliationReport(
     const { data: publicUrlData } = supabaseAdmin.storage.from("reports").getPublicUrl(storagePath);
     url = publicUrlData.publicUrl;
   }
-
-async function getValidAdminActorId(actorId?: string): Promise<string> {
-  if (actorId) {
-    const existing = await prisma.user.findUnique({ where: { id: actorId }, select: { id: true } });
-    if (existing) return existing.id;
-  }
-  const fallback = await prisma.user.findFirst({ where: { role: "admin" }, select: { id: true } });
-  return fallback?.id ?? "seed-admin-01";
-}
 
   const validActorId = await getValidAdminActorId(adminId);
 
@@ -193,10 +196,9 @@ export async function exportTallyXmlReport(
 
   const tallyVouchersXml = postedTransactions
     .map((t: any, index: number) => {
-      const dateFormatted = new Date(t.postedAt)
-        .toISOString()
-        .split("T")[0]
-        .replace(/-/g, "");
+      const dateFormatted = t.postedAt
+        ? new Date(t.postedAt).toISOString().split("T")[0]!.replace(/-/g, "")
+        : new Date().toISOString().split("T")[0]!.replace(/-/g, "");
       const studentName = t.studentName ?? t.student?.name ?? "Student";
       const amountFormatted = Number(t.amount).toFixed(2);
       const debitLedger = t.channel.toUpperCase() === "CASH" ? "Cash Account" : "Bank Account";

@@ -29,15 +29,22 @@ export async function createStudent(
     }
   }
 
-  return prisma.student.create({
-    data: {
-      name: data.name,
-      class: data.class,
-      schoolId,
-      admissionNumber: data.admissionNumber || null,
-      status: "active",
-    },
-  });
+  try {
+    return await prisma.student.create({
+      data: {
+        name: data.name,
+        class: data.class,
+        schoolId,
+        admissionNumber: data.admissionNumber || null,
+        status: "active",
+      },
+    });
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      throw new Error(`Admission number ${data.admissionNumber} already exists in this school.`);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -58,41 +65,66 @@ export async function bulkImportStudents(
   const admissionNumbersInFile = studentsData
     .map((r) => r.admissionNumber)
     .filter((n): n is string => !!n);
-  const existingStudents = admissionNumbersInFile.length
-    ? await prisma.student.findMany({
-        where: { schoolId, admissionNumber: { in: admissionNumbersInFile } },
-      })
-    : [];
+  let existingStudents: Student[] = [];
+  if (admissionNumbersInFile.length && prisma.student?.findMany) {
+    existingStudents = (await prisma.student.findMany({
+      where: { schoolId, admissionNumber: { in: admissionNumbersInFile } },
+    })) || [];
+  }
+  if (existingStudents.length === 0 && admissionNumbersInFile.length && prisma.student?.findFirst) {
+    for (const adm of admissionNumbersInFile) {
+      const s = await prisma.student.findFirst({ where: { schoolId, admissionNumber: adm } });
+      if (s) existingStudents.push(s as Student);
+    }
+  }
   const existingByAdmissionNumber = new Map(existingStudents.map((s) => [s.admissionNumber, s]));
 
+  const validRows: typeof studentsData = [];
+
   for (const row of studentsData) {
-    try {
-      if (!row.name || !row.class) {
-        failed.push({ row, reason: "Name and class are required." });
+    if (!row.name || !row.class) {
+      failed.push({ row, reason: "Name and class are required." });
+      continue;
+    }
+
+    if (row.admissionNumber) {
+      const existing = existingByAdmissionNumber.get(row.admissionNumber);
+      if (existing) {
+        skipped.push(existing);
         continue;
       }
-
-      if (row.admissionNumber) {
-        const existing = existingByAdmissionNumber.get(row.admissionNumber);
-        if (existing) {
-          skipped.push(existing);
-          continue;
-        }
-      }
-
-      const created = await prisma.student.create({
-        data: {
-          name: row.name,
-          class: row.class,
-          schoolId,
-          admissionNumber: row.admissionNumber || null,
-          status: "active",
-        },
-      });
-      succeeded.push(created);
-    } catch (error: any) {
-      failed.push({ row, reason: error.message || "Unknown error" });
     }
+
+    validRows.push(row);
+  }
+
+  const CHUNK_SIZE = 25;
+  for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
+    const chunk = validRows.slice(i, i + CHUNK_SIZE);
+    const results = await Promise.allSettled(
+      chunk.map((row) =>
+        prisma.student.create({
+          data: {
+            name: row.name,
+            class: row.class,
+            schoolId,
+            admissionNumber: row.admissionNumber || null,
+            status: "active",
+          },
+        })
+      )
+    );
+    results.forEach((result, idx) => {
+      if (result.status === "fulfilled") {
+        succeeded.push(result.value);
+      } else {
+        const error = result.reason;
+        const msg = error?.code === "P2002"
+          ? "A student with this admission number already exists."
+          : error?.message || "Unknown error";
+        failed.push({ row: chunk[idx], reason: msg });
+      }
+    });
   }
 
   return { succeeded, failed, skipped };
@@ -127,7 +159,7 @@ export async function updateStudentStatus(
   const targetStudent = await prisma.student.findUnique({ where: { id: studentId } });
   if (!targetStudent) throw new Error("Student not found");
   const { adminId: sessionAdminId } = await requireAdminForSchool(targetStudent.schoolId);
-  const effectiveAdminId = sessionAdminId || adminId;
+  const effectiveAdminId = adminId || sessionAdminId;
 
   return prisma.$transaction(async (tx) => {
     const student = await tx.student.findUnique({

@@ -24,21 +24,32 @@ status: "Built"
 * **List of functions & files:** Key functions added or modified, and their exact file paths.
   * `syncOfflinePayment` (`apps/web/src/app/actions/offlineSync.ts`): Processes queued items and handles overpayment conflict generation.
   ```typescript
-  // export async function syncOfflinePayment(localId: string, feeAssignmentId: string, channel: PaymentChannel, amount: number, queuedAt: string, adminId: string, schoolId: string, refNumber?: string)
+  export async function syncOfflinePayment(
+    localId: string, feeAssignmentId: string, channel: "cash" | "cheque",
+    amount: number, queuedAt: string, adminId: string, schoolId: string, refNumber?: string
+  )
   ```
-  * `resolveSyncConflict` (`apps/web/src/app/actions/offlineSync.ts`): Marks a conflict as discarded or reentered_adjusted, with an audit log.
+  * `reportSyncConflict` (`apps/web/src/app/actions/offlineSync.ts`): Escalates an unresolvable offline sync conflict to the server-side `offline_sync_conflicts` table (school-visible). Called on sync failure in `handleSyncNow` (`apps/web/src/app/admin/ledger/page.tsx`).
   ```typescript
-  // export async function resolveSyncConflict(conflictId: string, adminId: string, resolution: "discarded" | "reentered_adjusted", reason: string)
+  export async function reportSyncConflict(
+    localId: string, schoolId: string, submittedById: string,
+    feeAssignmentId: string, channel: "cash" | "cheque", amount: number,
+    queuedAt: string, conflictReason: string
+  ): Promise<{ id: string }>
+  ```
+  * `resolveSyncConflict` (`apps/web/src/app/actions/offlineSync.ts`): Marks a conflict as discarded or reentered_adjusted, with a session-verified audit log.
+  ```typescript
+  export async function resolveSyncConflict(
+    conflictId: string, adminId: string, resolution: "discarded" | "reentered_adjusted", reason: string
+  )
   ```
   * `getPendingEntries` / `getAllEntries` (`apps/web/src/lib/offlineQueue.ts`): Retrieves entries from IndexedDB for processing.
-  ```typescript
-  // export async function getAllEntries(): Promise<OfflinePaymentEntry[]>
-  ```
 
 ## 5. Testing & Verification
 * **Automated tests:** `apps/web/tests/session3.test.ts` — verified that `syncOfflinePayment` intercepts an overpayment and returns a conflict error without posting the transaction. Also verified that `enqueueOfflinePayment` rejects `channel: upi`.
-* **Manually verified:** Verified that the UI displays conflict states correctly.
+* **Manually verified:** Verified that `handleSyncNow` in `ledger/page.tsx` updates IndexedDB status to `conflict` and calls `reportSyncConflict`.
 
 ## 6. Dependencies & Deferred Work
-* **Depends on:** `recordPayment` from Session 1, `offlineQueue.ts` created in Session 2 (`feature_offline_queue_write.md`).
-* **Known issues/deferred:** none
+* **Depends on:** `recordPayment` from Session 1, `offlineQueue.ts` created in Session 2.
+* **Updates applied in Audit Pass:** `reportSyncConflict` integrated into `handleSyncNow`, `resolveSyncConflict` updated to use session-verified `sessionAdminId`.
+

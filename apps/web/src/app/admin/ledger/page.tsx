@@ -6,7 +6,7 @@ import { generateReceipt } from "@/app/actions/receipts";
 import { exportTallyXmlReport } from "@/app/actions/reports";
 import { processOcrUploadAction, confirmOcrEntryAction } from "@/app/actions/ai";
 import { getAllEntries, updateEntryStatus, removeEntry, type OfflinePaymentEntry } from "@/lib/offlineQueue";
-import { syncOfflinePayment, getSyncConflicts, resolveSyncConflict } from "@/app/actions/offlineSync";
+import { syncOfflinePayment, getSyncConflicts, resolveSyncConflict, reportSyncConflict } from "@/app/actions/offlineSync";
 import { useDataState } from "@/lib/useDataState";
 import { FiveStateRenderer } from "@/components/FiveStateRenderer";
 import { GlassCard } from "@/components/GlassCard";
@@ -20,6 +20,8 @@ import type { OcrExtractionResult } from "@smart-school/ai";
 
 import { PosReceiptModal } from "@/components/PosReceiptModal";
 import { TransactionActionsModal, type TransactionActionType } from "./TransactionActionsModal";
+import { SoundboxToggle } from "@/components/SoundboxToggle";
+import { playPaymentSoundbox } from "@/lib/soundbox";
 
 const CHANNELS = ["all", "upi", "cash", "cheque"] as const;
 
@@ -149,6 +151,7 @@ export default function AdminLedgerPage() {
           ...(ocrRefNumber ? { refNumber: ocrRefNumber } : {}),
         });
         setOcrStage({ type: "confirmed", transactionId: result.transaction.id });
+        playPaymentSoundbox(Number(ocrAmount));
         toast.success("Transaction posted to ledger");
       } catch (err: any) {
         setOcrStage({ type: "error", message: err.message || "Confirmation failed" });
@@ -183,6 +186,18 @@ export default function AdminLedgerPage() {
           await removeEntry(entry.local_id);
         } else {
           await updateEntryStatus(entry.local_id, "conflict");
+          // Fix 20: escalate to server-side school-wide conflict table
+          // so any admin (not just this device) can see and resolve it.
+          await reportSyncConflict(
+            entry.local_id,
+            schoolId,
+            adminId,
+            entry.fee_assignment_id,
+            entry.channel as "cash" | "cheque",
+            entry.amount,
+            entry.queued_at,
+            res.conflictReason ?? "unknown_error"
+          ).catch(console.error); // non-blocking — local status already updated
         }
       }
       await loadLocalQueue();
@@ -212,9 +227,12 @@ export default function AdminLedgerPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 font-sans">
       {/* Workspace Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Finance Operations</h1>
-        <p className="text-text-secondary text-sm">Master ledger journal, statement/cheque scanner & offline sync queue.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight">Finance Operations</h1>
+          <p className="text-text-secondary text-sm">Master ledger journal, statement/cheque scanner & offline sync queue.</p>
+        </div>
+        <SoundboxToggle />
       </div>
 
       {/* Top Segmented Workspace Controller */}

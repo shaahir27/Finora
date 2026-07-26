@@ -149,7 +149,7 @@ export function StudentProfileClient({
             })
             .filter((a: any) => a.remainingBalance > 0);
 
-          const parentInfo = data.parentLinks?.[0]?.parentLink?.user;
+          const parentInfo = (data as any).guardianOf?.[0]?.parentLink?.user ?? (data as any).parentLinks?.[0]?.parentLink?.user;
 
           return (
             <div className="space-y-6 sm:space-y-8">
@@ -161,22 +161,18 @@ export function StudentProfileClient({
                       {data.name.charAt(0)}
                     </div>
                     <div>
-                      <div className="flex flex-wrap items-center gap-2.5">
+                      <div className="flex items-center gap-2">
                         <h1 className="text-xl sm:text-2xl font-extrabold text-text-primary tracking-tight">
                           {data.name}
                         </h1>
-                        <span
-                          className={`px-3 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full ${
-                            data.status === "active"
-                              ? "bg-[#059669]/10 text-[#059669] border border-[#059669]/20"
-                              : "bg-slate-500/10 text-slate-600 border border-slate-500/20"
-                          }`}
-                        >
-                          {data.status}
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#0F5A47]/10 text-[#0F5A47]">
+                          Class {data.class}
                         </span>
                       </div>
-                      <p className="text-text-secondary text-xs sm:text-sm font-semibold mt-1">
-                        Class {data.class} • Admission #{data.admissionNumber || "ADM-DEMO"}
+                      <p className="text-xs text-text-secondary mt-1">
+                        Admission #: <span className="font-mono font-bold">{data.admissionNumber || "N/A"}</span>
+                        {" • "}
+                        Guardian: <span className="font-semibold text-text-primary">{parentInfo?.email || "Not linked"}</span>
                       </p>
                     </div>
                   </div>
@@ -186,7 +182,9 @@ export function StudentProfileClient({
                     {payableAssignments.length > 0 && (
                       <>
                         <button
-                          onClick={() => setShowPaymentModal(true)}
+                          onClick={() => {
+                            setShowPaymentModal(true);
+                          }}
                           className="flex-1 lg:flex-none px-4 py-2 bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-bold rounded-xl shadow-md hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-1.5"
                         >
                           <CreditCard className="w-3.5 h-3.5" />
@@ -194,7 +192,7 @@ export function StudentProfileClient({
                         </button>
                         <button
                           onClick={() => {
-                            if (payableAssignments.length > 0) {
+                            if (payableAssignments[0]?.id) {
                               setWaiverAssignmentId(payableAssignments[0].id);
                             }
                             setShowWaiverModal(true);

@@ -55,7 +55,7 @@ export function PushSettingsToggle({ userId }: { userId: string }) {
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
           await subscription.unsubscribe();
-          await unsubscribeFromPush(userId, subscription.endpoint);
+          await unsubscribeFromPush(subscription.endpoint);
         }
         setIsSubscribed(false);
       } else {
@@ -73,7 +73,7 @@ export function PushSettingsToggle({ userId }: { userId: string }) {
 
         const subJSON = subscription.toJSON();
         
-        await subscribeToPush(userId, {
+        await subscribeToPush({
           endpoint: subJSON.endpoint!,
           keys: {
             p256dh: subJSON.keys!.p256dh!,

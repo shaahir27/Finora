@@ -105,7 +105,7 @@ export default function ParentCopilotPage() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-130px)] sm:h-[calc(100vh-120px)] font-sans">
+    <div className="max-w-4xl mx-auto flex flex-col h-[calc(100dvh-175px)] md:h-[calc(100dvh-120px)] font-sans">
       {/* Header */}
       <div className="mb-3.5 sm:mb-4 flex items-center justify-between">
         <div>
@@ -141,7 +141,7 @@ export default function ParentCopilotPage() {
                 <button
                   key={prompt}
                   onClick={() => setInput(prompt)}
-                  className="px-3.5 py-1.5 bg-white border border-[#0F5A47]/20 text-[#0F5A47] text-xs font-bold rounded-full hover:bg-[#0F5A47]/10 active:scale-95 transition-all shadow-xs"
+                  className="px-3.5 py-2.5 bg-white border border-[#0F5A47]/20 text-[#0F5A47] text-xs font-bold rounded-full hover:bg-[#0F5A47]/10 active:scale-95 transition-all shadow-xs min-h-[44px] flex items-center"
                 >
                   {prompt}
                 </button>
@@ -163,7 +163,7 @@ export default function ParentCopilotPage() {
 
                 <div className="group relative max-w-[88%] sm:max-w-[80%] space-y-1">
                   <div
-                    className={`rounded-2xl px-4 py-3 text-xs leading-relaxed whitespace-pre-wrap ${
+                    className={`rounded-2xl px-4 py-3 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${
                       msg.role === "user"
                         ? "bg-[#0F5A47] text-white rounded-br-xs font-medium shadow-sm"
                         : "bg-white text-text-primary rounded-bl-xs border border-[#0F5A47]/15 shadow-sm"
@@ -177,7 +177,7 @@ export default function ParentCopilotPage() {
                     <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium px-1">
                       <button
                         onClick={() => copyMessageText(msg.id, msg.text)}
-                        className="hover:text-[#0F5A47] flex items-center gap-1 transition-colors"
+                        className="hover:text-[#0F5A47] flex items-center gap-1 transition-colors min-h-[32px]"
                       >
                         {copiedId === msg.id ? (
                           <>
@@ -223,7 +223,7 @@ export default function ParentCopilotPage() {
               <div className="flex justify-start pl-9">
                 <a
                   href={suggestion.deepLink}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0F5A47]/10 border border-[#0F5A47]/20 rounded-xl text-[#0F5A47] text-xs font-bold hover:bg-[#0F5A47]/20 transition-all shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0F5A47]/10 border border-[#0F5A47]/20 rounded-xl text-[#0F5A47] text-xs font-bold hover:bg-[#0F5A47]/20 transition-all shadow-xs min-h-[44px]"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>{suggestion.label}</span>
@@ -243,12 +243,12 @@ export default function ParentCopilotPage() {
           onChange={(e) => setInput(e.target.value)}
           placeholder={t("placeholder")}
           disabled={loading}
-          className="flex-1 bg-white border border-[#0F5A47]/20 rounded-2xl px-4 py-3 text-xs text-text-primary outline-none focus:border-[#0F5A47] shadow-xs"
+          className="flex-1 bg-white border border-[#0F5A47]/20 rounded-2xl px-4 py-3 text-base sm:text-xs text-text-primary outline-none focus:border-[#0F5A47] shadow-xs min-h-[44px]"
         />
         <button
           type="submit"
           disabled={loading || !input.trim()}
-          className="px-5 py-3 bg-[#0F5A47] text-white rounded-2xl text-xs font-bold hover:bg-[#0D7A5F] active:scale-95 transition-all disabled:opacity-40 flex items-center gap-1.5 shadow-md"
+          className="px-5 py-3 bg-[#0F5A47] text-white rounded-2xl text-xs font-bold hover:bg-[#0D7A5F] active:scale-95 transition-all disabled:opacity-40 flex items-center gap-1.5 shadow-md min-h-[44px]"
         >
           <span className="hidden sm:inline">Ask Copilot</span>
           <Send className="w-3.5 h-3.5" />

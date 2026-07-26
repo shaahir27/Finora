@@ -54,10 +54,7 @@ export default function ParentSettingsPage() {
       if (isSubscribed) {
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
-          const parentUserId = session?.user?.id;
-          if (parentUserId) {
-            await unsubscribeFromPush(parentUserId, subscription.endpoint);
-          }
+          await unsubscribeFromPush(subscription.endpoint);
           await subscription.unsubscribe();
         }
         setIsSubscribed(false);
@@ -75,16 +72,13 @@ export default function ParentSettingsPage() {
 
         const subJson = subscription.toJSON();
         
-        const parentUserId = session?.user?.id;
-        if (parentUserId) {
-          await subscribeToPush(parentUserId, {
-            endpoint: subscription.endpoint,
-            keys: {
-              p256dh: subJson.keys?.p256dh as string,
-              auth: subJson.keys?.auth as string,
-            }
-          }, "Parent Web App");
-        }
+        await subscribeToPush({
+          endpoint: subscription.endpoint,
+          keys: {
+            p256dh: subJson.keys?.p256dh as string,
+            auth: subJson.keys?.auth as string,
+          }
+        }, "Parent Web App");
         
         setIsSubscribed(true);
         toast.success("Push notifications enabled!");
@@ -214,7 +208,7 @@ export default function ParentSettingsPage() {
           </div>
 
           <div className="space-y-3 text-xs">
-            <label className="font-bold text-text-primary block">
+            <label className="font-bold text-text-primary block text-xs uppercase tracking-wider">
               Default Quick-Pay Channel:
             </label>
             <select
@@ -223,7 +217,7 @@ export default function ParentSettingsPage() {
                 setPreferredChannel(e.target.value);
                 toast.success(`Default channel set to ${e.target.value.toUpperCase()}`);
               }}
-              className="w-full bg-white border border-[#0F5A47]/20 rounded-xl px-4 py-2.5 font-bold text-text-primary outline-none focus:border-[#0F5A47]"
+              className="w-full bg-white border border-[#0F5A47]/20 rounded-xl px-4 py-3 font-bold text-text-primary outline-none focus:border-[#0F5A47] text-base sm:text-xs min-h-[44px]"
             >
               <option value="upi">UPI (GPay / PhonePe / Paytm / BHIM)</option>
               <option value="netbanking">Net Banking</option>

@@ -16,6 +16,7 @@ import { getRemindersQueue, markReminderSent } from "@/app/actions/reminders";
 import type { ReminderQueueItem } from "@/app/actions/reminders";
 import { GlassCard } from "@/components/GlassCard";
 import { DEMO_SCHOOL_ID } from "@/lib/school-context";
+import { buildWhatsAppPaymentUrl } from "@/lib/whatsapp";
 
 // Hardcoded for demo — Session 6: derive from auth session
 const SCHOOL_ID = DEMO_SCHOOL_ID;
@@ -238,6 +239,20 @@ export default function RemindersQueuePage() {
                     >
                       {isExpanded ? "Hide" : "Preview"}
                     </button>
+                    <a
+                      href={buildWhatsAppPaymentUrl({
+                        phone: "+919876543210",
+                        studentName: r.studentName,
+                        studentClass: "Student",
+                        amountRupees: r.remainingBalance,
+                        feeAssignmentId: r.feeAssignmentId,
+                      })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-3 py-1.5 rounded-lg font-bold transition-all hover:bg-emerald-600 bg-emerald-700 text-white inline-flex items-center gap-1"
+                    >
+                      <span>💬 WhatsApp</span>
+                    </a>
                     {!isSent && (
                       <button
                         id={`reminder-mark-sent-${r.id}`}

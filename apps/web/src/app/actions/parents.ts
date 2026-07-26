@@ -3,7 +3,8 @@
 import { prisma } from "@smart-school/db";
 import { initiateUpiSandboxPayment as _initiateUpiSandboxPayment } from "@smart-school/payments";
 import { calculateAmountPaid, calculateRemainingBalance, calculateWaivedAmount } from "@smart-school/rules";
-import { recordPayment } from "./ledger";
+import { recordPaymentFromSandbox } from "./ledger";
+import { requireAdminForSchool, requireParentSession } from "@/lib/require-session";
 
 // ---------------------------------------------------------------------------
 // ADMIN PROVISIONING ACTIONS
@@ -17,6 +18,8 @@ export async function createParentAccount(
   schoolId: string,
   data: { name: string; phone: string; email?: string; studentIds: string[] }
 ) {
+  await requireAdminForSchool(schoolId);
+
   if (!data.studentIds || data.studentIds.length === 0) {
     throw new Error("A parent account must have at least one linked student.");
   }
@@ -68,7 +71,9 @@ export async function createParentAccount(
 /**
  * Adds a student to an existing parent.
  */
-export async function addStudentToParent(parentUserId: string, studentId: string) {
+export async function addStudentToParent(studentId: string) {
+  const { parentUserId } = await requireParentSession();
+
   const parentLink = await prisma.parentLink.findUnique({
     where: { userId: parentUserId },
   });
@@ -88,7 +93,9 @@ export async function addStudentToParent(parentUserId: string, studentId: string
 /**
  * Removes a student from a parent.
  */
-export async function removeStudentFromParent(parentUserId: string, studentId: string) {
+export async function removeStudentFromParent(studentId: string) {
+  const { parentUserId } = await requireParentSession();
+
   const parentLink = await prisma.parentLink.findUnique({
     where: { userId: parentUserId },
   });
@@ -114,7 +121,9 @@ export async function removeStudentFromParent(parentUserId: string, studentId: s
 /**
  * Gets all linked active children for a parent user.
  */
-export async function getMyChildren(parentUserId: string) {
+export async function getMyChildren() {
+  const { parentUserId } = await requireParentSession();
+
   const parentLink = await prisma.parentLink.findUnique({
     where: { userId: parentUserId },
     include: {
@@ -143,7 +152,9 @@ export async function getMyChildren(parentUserId: string) {
 /**
  * Gets dues for all children (or a specific child) linked to this parent.
  */
-export async function getMyChildrenDues(parentUserId: string, studentId?: string) {
+export async function getMyChildrenDues(studentId?: string) {
+  const { parentUserId } = await requireParentSession();
+
   const parentLink = await prisma.parentLink.findUnique({
     where: { userId: parentUserId },
     include: {
@@ -220,9 +231,12 @@ export async function payDueViaUpi(feeAssignmentId: string, amount: number) {
     throw new Error("Amount must be greater than 0");
   }
 
+  const { parentLinkId } = await requireParentSession();
+
   const assignment = await prisma.feeAssignment.findUnique({
     where: { id: feeAssignmentId },
     include: {
+      student: { include: { guardianOf: true } },
       transactions: { where: { reconciliationStatus: "posted" } },
       waivers: true,
     },
@@ -232,12 +246,16 @@ export async function payDueViaUpi(feeAssignmentId: string, amount: number) {
     throw new Error("Fee assignment not found");
   }
 
-  const amountPaid = calculateAmountPaid(assignment.transactions);
-  const waived = calculateWaivedAmount(assignment.waivers);
+  const amountPaid = calculateAmountPaid(assignment.transactions ?? []);
+  const waived = calculateWaivedAmount(assignment.waivers ?? []);
   const remaining = calculateRemainingBalance(assignment.amount.toNumber(), amountPaid, waived);
 
   if (amount > remaining) {
     throw new Error(`Amount cannot exceed remaining balance of ₹${remaining}`);
+  }
+
+  if (!assignment.student?.guardianOf?.some((g: any) => g.parentLinkId === parentLinkId)) {
+    throw new Error("You do not have access to this fee assignment.");
   }
 
   const amountPaise = Math.round(amount * 100);
@@ -248,20 +266,29 @@ export async function payDueViaUpi(feeAssignmentId: string, amount: number) {
  * Simulates a successful UPI sandbox payment by recording it directly.
  */
 export async function simulateSandboxPayment(feeAssignmentId: string, amount: number) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Sandbox payments are disabled in production.");
+  }
+
+  const { parentLinkId } = await requireParentSession();
+
   const assignment = await prisma.feeAssignment.findUnique({
     where: { id: feeAssignmentId },
-    include: { student: true },
+    include: { student: { include: { guardianOf: true } } },
   });
 
   if (!assignment) {
     throw new Error("Fee assignment not found");
   }
 
+  if (!assignment.student.guardianOf.some((g) => g.parentLinkId === parentLinkId)) {
+    throw new Error("You do not have access to this fee assignment.");
+  }
+
   const schoolId = assignment.student.schoolId;
-  const adminId = "sandbox-parent-simulation";
   const refNumber = "sim_" + Math.random().toString(36).substring(2, 10);
 
-  return recordPayment(adminId, schoolId, {
+  return recordPaymentFromSandbox(schoolId, {
     feeAssignmentId,
     channel: "upi",
     amount,
@@ -273,9 +300,9 @@ export async function simulateSandboxPayment(feeAssignmentId: string, amount: nu
  * Gets payment history for a parent's children.
  */
 export async function getMyPaymentHistory(
-  parentUserId: string,
   options?: { studentId?: string; limit?: number; cursor?: string }
 ) {
+  const { parentUserId } = await requireParentSession();
   const limit = options?.limit ?? 20;
 
   const parentLink = await prisma.parentLink.findUnique({
@@ -335,10 +362,11 @@ export async function getMyPaymentHistory(
  * Generates an official Section 80C Tuition Fee Tax Exemption Certificate for a student.
  */
 export async function generate80CTaxCertificateAction(
-  parentUserId: string,
   studentId: string,
   financialYear: string = "2025-2026"
 ) {
+  const { parentUserId } = await requireParentSession();
+
   const parentLink = await prisma.parentLink.findUnique({
     where: { userId: parentUserId },
     include: {
@@ -364,7 +392,7 @@ export async function generate80CTaxCertificateAction(
     throw new Error("Student not linked to parent.");
   }
 
-  const student = parentLink.guardianOf[0].student;
+  const student = parentLink.guardianOf[0]!.student;
 
   let totalTuitionPaid = 0;
   for (const fa of student.feeAssignments) {
@@ -390,26 +418,30 @@ export async function generate80CTaxCertificateAction(
     }),
   };
 }
+
 /**
  * Gets the PARENT_LINK id for a given user id.
- * Used by the client to store the parentLinkId in sessionStorage
- * so the Copilot can scope its tool context correctly.
  */
-export async function getParentLinkId(userId: string): Promise<string | null> {
+export async function getParentLinkId(userId?: string): Promise<string | null> {
+  const session = await requireParentSession();
+  const targetUserId = userId || session.parentUserId;
+
   const link = await prisma.parentLink.findUnique({
-    where: { userId },
+    where: { userId: targetUserId },
     select: { id: true },
   });
   return link?.id ?? null;
 }
 
 /**
- * Gets the schoolId for a given parent userId (via their linked user row).
- * Used by the client to scope copilot queries.
+ * Gets the schoolId for a given parent userId.
  */
-export async function getParentSchoolId(userId: string): Promise<string | null> {
+export async function getParentSchoolId(userId?: string): Promise<string | null> {
+  const session = await requireParentSession();
+  const targetUserId = userId || session.parentUserId;
+
   const user = await prisma.user.findUnique({
-    where: { id: userId },
+    where: { id: targetUserId },
     select: { schoolId: true },
   });
   return user?.schoolId ?? null;

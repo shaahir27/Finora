@@ -8,8 +8,10 @@ import I18nProvider from "@/components/I18nProvider";
 import { useTranslations } from "next-intl";
 import { signOut, useSession, SessionProvider } from "next-auth/react";
 import { Menu, X } from "lucide-react";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 
 const PUBLIC_PATHS = ["/parent/login"];
+
 
 function ParentSidebar({ closeMenu }: { closeMenu?: () => void }) {
   const t = useTranslations("Navigation");
@@ -62,8 +64,11 @@ function ParentSidebar({ closeMenu }: { closeMenu?: () => void }) {
       <div className="pt-4 border-t border-[#0F5A47]/15 px-2">
         <button
           type="button"
-          onClick={() => signOut({ callbackUrl: "/parent/login" })}
-          className="w-full py-2 px-3 rounded-xl text-xs font-bold text-red-600 hover:bg-red-500/10 transition-colors text-left flex items-center gap-2"
+          onClick={async () => {
+            await signOut({ redirect: false });
+            window.location.href = window.location.origin + "/parent/login";
+          }}
+          className="w-full py-2 px-3 rounded-xl text-xs font-bold text-red-600 hover:bg-red-500/10 transition-colors text-left flex items-center gap-2 cursor-pointer"
         >
           <span>🚪</span>
           <span>{t("logout")}</span>
@@ -114,11 +119,11 @@ function ParentLayoutInner({ children }: { children: ReactNode }) {
 
   return (
     <I18nProvider>
-      <div className="min-h-screen bg-bg-base flex flex-col md:flex-row overflow-hidden">
+      <div className="min-h-dvh bg-bg-base flex flex-col md:flex-row overflow-hidden">
         {/* Mobile Top Bar */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-[#EBE7DF] border-b border-[#0F5A47]/15 z-40 sticky top-0">
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-[#EBE7DF] border-b border-[#0F5A47]/15 z-40 sticky top-0 shadow-xs">
           <Link href="/parent/dues" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white bg-gradient-to-br from-[#0F5A47] to-[#0D7A5F] shadow-sm">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-white bg-gradient-to-br from-[#0F5A47] to-[#0D7A5F] shadow-sm">
               ₹
             </div>
             <div>
@@ -144,7 +149,7 @@ function ParentLayoutInner({ children }: { children: ReactNode }) {
         )}
 
         {/* Sidebar Navigation */}
-        <div className={`fixed inset-y-0 left-0 z-50 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition-transform duration-200 ease-in-out md:flex w-64 flex-col bg-bg-surface border-r border-border-glass h-screen`}>
+        <div className={`fixed inset-y-0 left-0 z-50 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition-transform duration-200 ease-in-out md:flex w-64 flex-col bg-bg-surface border-r border-border-glass h-dvh`}>
           {/* Close button on mobile */}
           <div className="md:hidden absolute top-3.5 right-3.5 z-50">
             <button 
@@ -159,10 +164,14 @@ function ParentLayoutInner({ children }: { children: ReactNode }) {
         </div>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-auto min-h-[calc(100vh-57px)] md:h-screen p-3.5 sm:p-6 md:p-8 relative">
+        <main className="flex-1 overflow-auto min-h-[calc(100dvh-57px)] md:h-screen p-3.5 sm:p-6 md:p-8 relative pb-24 md:pb-8">
           {children}
         </main>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <MobileBottomNav />
       </div>
     </I18nProvider>
   );
 }
+

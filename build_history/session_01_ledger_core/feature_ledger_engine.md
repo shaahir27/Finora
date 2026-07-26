@@ -22,37 +22,35 @@ status: "Built"
 
 ## 4. Core Logic & Necessary Functions
 * **List of functions & files:** Key functions added or modified, and their exact file paths.
-  * `recordPayment` (`apps/web/src/app/actions/ledger.ts`): The core payment recording function that implements mathematical locks and detects anomalies synchronously.
+  * `recordPaymentInternal` (`apps/web/src/app/actions/ledger.ts`): Internal payment recording function with row-level locking (`SELECT ... FOR UPDATE`), anomaly detection (`round2`), and duplicate ref checks.
+  * `recordPayment` (`apps/web/src/app/actions/ledger.ts`): Public admin entry point for payment recording; requires active admin session via `requireAdminForSchool(schoolId)`.
   ```typescript
   export async function recordPayment(
     adminId: string, schoolId: string,
     data: { feeAssignmentId: string; channel: PaymentChannel; amount: number; refNumber?: string; }
   )
-  // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
-  * `reverseTransaction` (`apps/web/src/app/actions/ledger.ts`): Reverses a transaction, preventing any future state changes and writes an audit log.
+  * `recordPaymentFromWebhook` (`apps/web/src/app/actions/ledger.ts`): Public Razorpay webhook entry point authenticated by signature verification.
+  * `recordPaymentFromSandbox` (`apps/web/src/app/actions/ledger.ts`): Public parent sandbox simulation entry point.
+  * `reverseTransaction` (`apps/web/src/app/actions/ledger.ts`): Reverses a transaction, preventing future state changes and writing an audit log. Guarded by `requireAdminForSchool`.
   ```typescript
   export async function reverseTransaction(
     adminId: string, transactionId: string, reason: string
   ): Promise<Transaction>
-  // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
-  * `applyWaiver` (`apps/web/src/app/actions/ledger.ts`): Applies a financial waiver to a specific fee assignment with mandatory audit logging. Also triggers a defaulter score recompute for the affected student. **Correction applied 2026-07-24**: the defaulter score recompute loop used `totalWaived` (a cumulative sum across all assignments) as the per-assignment waived amount in `calculateRemainingBalance`, causing the remaining balance to be underestimated on the 2nd+ assignment and producing a wrong defaulter score after any waiver. Fixed to capture per-assignment `wv` before accumulating into `totalWaived`.
+  * `applyWaiver` (`apps/web/src/app/actions/ledger.ts`): Applies a financial waiver to a specific fee assignment with mandatory audit logging and defaulter score recomputation. Guarded by `requireAdminForSchool`.
   ```typescript
   export async function applyWaiver(
     adminId: string, schoolId: string, feeAssignmentId: string,
     data: { amount: number; reason: string; }
   )
-  // Note: feeAssignmentId is a positional argument, NOT nested inside data.
-  // Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
-  * `applyPenalty` (`apps/web/src/app/actions/ledger.ts`): Applies a financial penalty (e.g. late fee) with mandatory audit logging.
+  * `applyPenalty` (`apps/web/src/app/actions/ledger.ts`): Applies a financial penalty with mandatory audit logging and defaulter score recomputation. Guarded by `requireAdminForSchool`.
   ```typescript
   export async function applyPenalty(
     adminId: string, transactionId: string,
     data: { amount: number; reason: string; }
   )
-  // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
   * `getLedgerSnapshot` (`apps/web/src/app/actions/ledger.ts`): Aggregates total collected revenue (excluding `flagged` transactions) and pending fees across the school.
   ```typescript
@@ -60,11 +58,11 @@ status: "Built"
     schoolId: string, options?: { channel?: PaymentChannel; startDate?: Date; endDate?: Date; cursor?: string; limit?: number; }
   )
   ```
-  * `markChequeCleared` (`apps/web/src/app/actions/ledger.ts`): Safely advances a cheque's reconciliation status to posted.
+  * `markChequeCleared` (`apps/web/src/app/actions/ledger.ts`): Safely advances a cheque's reconciliation status to posted with session-derived audit log. Guarded by `requireAdminForSchool`.
   ```typescript
   export async function markChequeCleared(transactionId: string): Promise<Transaction>
   ```
-  * `resolveAnomaly` (`apps/web/src/app/actions/ledger.ts`): Resolves a flagged anomaly transaction as either `posted` or `reversed` with mandatory audit logging and note tracking.
+  * `resolveAnomaly` (`apps/web/src/app/actions/ledger.ts`): Resolves a flagged anomaly transaction as either `posted` or `reversed` with mandatory audit logging. Guarded by `requireAdminForSchool(transaction.schoolId)`.
   ```typescript
   export async function resolveAnomaly(
     adminId: string, transactionId: string, resolution: "posted" | "reversed", notes?: string
@@ -79,4 +77,5 @@ status: "Built"
 
 ## 6. Dependencies & Deferred Work
 * **Depends on:** `detectAnomaly` and `computeDefaulterScore` from `packages/rules`.
-* **Updates applied in Audit Pass**: `resolveAnomaly` action added, `totalCollected` updated to exclude `flagged` status, `applyWaiver` validated against balance, and `applyPenalty` updated to recompute defaulter score.
+* **Updates applied in Audit Pass**: `resolveAnomaly` action updated with real school scoping, `recordPayment` refactored into `recordPaymentInternal`, `markChequeCleared` updated to single-argument signature with audit logging, and `P2002` duplicate handling added for transaction ref numbers.
+

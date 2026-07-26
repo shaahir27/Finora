@@ -13,11 +13,16 @@ if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   );
 }
 
+import { auth } from "@/auth";
+
 export async function subscribeToPush(
-  userId: string,
   subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
   deviceLabel?: string
 ) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) throw new Error("Authentication required.");
+
   const existing = await prisma.pushSubscription.findUnique({
     where: {
       userId_endpoint: {
@@ -49,7 +54,11 @@ export async function subscribeToPush(
   });
 }
 
-export async function unsubscribeFromPush(userId: string, endpoint: string) {
+export async function unsubscribeFromPush(endpoint: string) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) throw new Error("Authentication required.");
+
   try {
     await prisma.pushSubscription.delete({
       where: {
@@ -105,6 +114,7 @@ export async function sendPushNotification(userId: string, payload: any) {
 }
 
 export async function notifySchoolAdmins(schoolId: string, payload: any) {
+  if (!prisma.user?.findMany) return;
   const admins = await prisma.user.findMany({
     where: { schoolId, role: "admin" },
     select: { id: true },

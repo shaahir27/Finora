@@ -12,6 +12,7 @@ import {
   resolveAnomaly,
 } from "@/app/actions/ledger";
 import toast from "react-hot-toast";
+import { playPaymentSoundbox } from "@/lib/soundbox";
 
 export type TransactionActionType =
   | "reverse"
@@ -55,6 +56,7 @@ export function TransactionActionsModal({
         toast.success("Transaction reversed.");
       } else if (actionType === "clear_cheque") {
         await markChequeCleared(transaction.id);
+        playPaymentSoundbox(Number(transaction.amount), transaction.student?.name);
         toast.success("Cheque marked as cleared.");
       } else if (actionType === "bounce_cheque") {
         if (!reason.trim()) throw new Error("A reason is required to bounce a cheque.");

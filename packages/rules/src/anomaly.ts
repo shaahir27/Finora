@@ -42,16 +42,18 @@ export function detectAnomaly(
   // If remaining balance is 1000, and they pay 500, IS it an anomaly? Yes, because 500 !== 1000.
   // So the rule is simply: receivedAmount !== expectedAmount.
 
-  if (numReceived !== expectedAmount) {
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  if (round2(numReceived) !== round2(expectedAmount)) {
     return {
       isAnomalous: true,
       reason: "amount_mismatch",
-      expectedAmount,
+      expectedAmount: round2(expectedAmount),
     };
   }
 
   return {
     isAnomalous: false,
-    expectedAmount,
+    expectedAmount: round2(expectedAmount),
   };
 }

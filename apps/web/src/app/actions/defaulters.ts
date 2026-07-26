@@ -29,11 +29,30 @@ export async function getDefaulters(schoolId: string) {
   });
 
   const scoresToUpsert = [];
+  const studentIds = students.map((s) => s.id);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const existingScoresToday = prisma.defaulterScore?.findMany
+    ? await prisma.defaulterScore.findMany({
+        where: { studentId: { in: studentIds }, schoolId, computedAt: { gte: todayStart } },
+        orderBy: { computedAt: "desc" },
+      })
+    : [];
+
+  const existingByStudent = new Map<string, (typeof existingScoresToday)[number]>();
+  for (const s of existingScoresToday) {
+    if (!existingByStudent.has(s.studentId)) existingByStudent.set(s.studentId, s);
+  }
+
+  const toCreate: any[] = [];
+  const toUpdate: { id: string; riskLevel: number; computedReason: string }[] = [];
 
   for (const student of students) {
     let totalAmount = 0;
     let totalPaid = 0;
     let totalWaived = 0;
+    let totalRemainingClamped = 0;
     let maxDaysOverdue = 0;
     let brokenPromiseCount = 0;
 
@@ -44,6 +63,8 @@ export async function getDefaulters(schoolId: string) {
       const wv = calculateWaivedAmount(a.waivers);
       totalWaived += wv;
       const bal = calculateRemainingBalance(a.amount.toNumber(), pd, wv);
+      totalRemainingClamped += bal;
+
       if (bal > 0) {
         const days = Math.max(
           0,
@@ -65,7 +86,7 @@ export async function getDefaulters(schoolId: string) {
     );
 
     const riskLevelInt = score.riskLevel === "high" ? 3 : score.riskLevel === "medium" ? 2 : 1;
-    const remainingBalance = totalAmount - totalPaid - totalWaived;
+    const remainingBalance = totalRemainingClamped;
 
     // Only consider defaulters those who have a balance > 0
     if (remainingBalance > 0) {
@@ -80,38 +101,25 @@ export async function getDefaulters(schoolId: string) {
         admissionNumber: student.admissionNumber
       });
 
-      // Upsert: update today's score if it already exists, otherwise create.
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const existingToday = await prisma.defaulterScore.findFirst({
-        where: {
-          studentId: student.id,
-          schoolId,
-          computedAt: { gte: todayStart }
-        },
-        orderBy: { computedAt: "desc" }
-      });
-
+      const existingToday = existingByStudent.get(student.id);
       if (existingToday) {
-        await prisma.defaulterScore.update({
-          where: { id: existingToday.id },
-          data: {
-            riskLevel: riskLevelInt,
-            computedReason: score.reason
-          }
-        });
+        toUpdate.push({ id: existingToday.id, riskLevel: riskLevelInt, computedReason: score.reason });
       } else {
-        await prisma.defaulterScore.create({
-          data: {
-            studentId: student.id,
-            schoolId,
-            riskLevel: riskLevelInt,
-            computedReason: score.reason
-          }
-        });
+        toCreate.push({ studentId: student.id, schoolId, riskLevel: riskLevelInt, computedReason: score.reason });
       }
     }
+  }
+
+  if (toCreate.length > 0 || toUpdate.length > 0) {
+    await prisma.$transaction([
+      ...(toCreate.length ? [prisma.defaulterScore.createMany({ data: toCreate })] : []),
+      ...toUpdate.map((u) =>
+        prisma.defaulterScore.update({
+          where: { id: u.id },
+          data: { riskLevel: u.riskLevel, computedReason: u.computedReason },
+        })
+      ),
+    ]);
   }
 
   // Sort by risk level (high first) and then by maxDaysOverdue

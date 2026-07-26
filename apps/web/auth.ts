@@ -3,6 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { supabase } from "@/lib/supabase-client";
 import { DEMO_SCHOOL_ID } from "@/lib/school-context";
 
+const DEMO_LOGIN_ENABLED = process.env.NODE_ENV !== "production";
+
 const authConfig: NextAuthConfig = {
   providers: [
     CredentialsProvider({
@@ -17,6 +19,7 @@ const authConfig: NextAuthConfig = {
         
         // Demo hardcoded admin logic
         if (
+          DEMO_LOGIN_ENABLED &&
           credentials.email === "admin@school.edu" &&
           credentials.password === "demo1234"
         ) {
@@ -44,6 +47,7 @@ const authConfig: NextAuthConfig = {
 
         // DEMO BYPASS
         if (
+          DEMO_LOGIN_ENABLED &&
           (credentials.email === "parent@demo.com" || credentials.phone === "+919999999999") &&
           credentials.otp === "123456"
         ) {
@@ -78,6 +82,13 @@ const authConfig: NextAuthConfig = {
     }),
   ],
   callbacks: {
+    redirect({ url, baseUrl }: any) {
+      if (url.startsWith("/")) return url;
+      try {
+        if (new URL(url).origin === baseUrl) return url;
+      } catch {}
+      return url;
+    },
     jwt({ token, user }: any) {
       if (user) {
         token.role = user.role;

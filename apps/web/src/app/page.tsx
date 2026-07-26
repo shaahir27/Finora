@@ -39,7 +39,7 @@ const staggerContainer = {
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } },
+  show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 100, damping: 20 } },
 };
 
 // ─── Navbar ──────────────────────────────────────────────────────────────────
@@ -71,20 +71,22 @@ function Navbar() {
         <a href="#tech" className="hover:text-[#0F5A47] transition-colors">Architecture</a>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <Link
           href="/parent/dues"
-          className="text-xs font-bold px-4 py-2 rounded-xl text-[#0F172A] bg-white border border-[#0F5A47]/20 hover:bg-[#0F5A47]/10 transition-all flex items-center gap-1.5 shadow-xs"
+          className="text-xs font-bold px-3 py-2 rounded-xl text-[#0F172A] bg-white border border-[#0F5A47]/20 hover:bg-[#0F5A47]/10 transition-all flex items-center gap-1.5 shadow-xs"
         >
           <Smartphone className="w-3.5 h-3.5 text-[#0F5A47]" />
-          Parent Portal
+          <span className="hidden sm:inline">Parent Portal</span>
+          <span className="sm:hidden">Parent</span>
         </Link>
         <Link
           href="/admin/dashboard"
-          className="text-xs font-extrabold px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white hover:opacity-95 border border-[#0F5A47]/20 transition-all shadow-md shadow-[#0F5A47]/20 flex items-center gap-1.5 group"
+          className="text-xs font-extrabold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white hover:opacity-95 border border-[#0F5A47]/20 transition-all shadow-md shadow-[#0F5A47]/20 flex items-center gap-1.5 group"
         >
           <Shield className="w-3.5 h-3.5" />
-          Admin Console
+          <span className="hidden sm:inline">Admin Console</span>
+          <span className="sm:hidden">Admin</span>
           <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
         </Link>
       </div>
@@ -119,7 +121,7 @@ function Hero() {
 
           <motion.h1
             variants={fadeUp}
-            className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#0F172A] mb-6 leading-[1.08]"
+            className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#0F172A] mb-6 leading-[1.12]"
           >
             Reconcile School <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0F5A47] via-[#059669] to-[#0D7A5F]">
@@ -254,11 +256,11 @@ function LiveTerminalShowcase() {
             </div>
 
             {/* Selector Tabs (Interactive & Fully Functional) */}
-            <div className="flex flex-wrap gap-1.5 p-1 bg-black/5 rounded-xl border border-black/10 text-xs font-bold">
+            <div className="flex overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap gap-1.5 p-1 bg-black/5 rounded-xl border border-black/10 text-xs font-bold max-w-full">
               <button
                 type="button"
                 onClick={() => setActiveTab("rec")}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "rec"
                     ? "bg-[#0F5A47] text-white shadow-md"
                     : "text-[#475569] hover:text-[#0F172A] hover:bg-black/5"
@@ -269,7 +271,7 @@ function LiveTerminalShowcase() {
               <button
                 type="button"
                 onClick={() => setActiveTab("tally")}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "tally"
                     ? "bg-[#0F5A47] text-white shadow-md"
                     : "text-[#475569] hover:text-[#0F172A] hover:bg-black/5"
@@ -280,7 +282,7 @@ function LiveTerminalShowcase() {
               <button
                 type="button"
                 onClick={() => setActiveTab("ai")}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "ai"
                     ? "bg-[#0F5A47] text-white shadow-md"
                     : "text-[#475569] hover:text-[#0F172A] hover:bg-black/5"
@@ -291,7 +293,7 @@ function LiveTerminalShowcase() {
               <button
                 type="button"
                 onClick={() => setActiveTab("parent")}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "parent"
                     ? "bg-[#0F5A47] text-white shadow-md"
                     : "text-[#475569] hover:text-[#0F172A] hover:bg-black/5"
@@ -498,8 +500,9 @@ function Footer() {
 
 function FloatingJudgeDock() {
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-white/95 border border-[#0F5A47]/25 shadow-xl shadow-[#0F5A47]/15 backdrop-blur-2xl flex items-center gap-2.5">
+    <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-white/95 border border-[#0F5A47]/25 shadow-xl shadow-[#0F5A47]/15 backdrop-blur-2xl flex items-center gap-2.5 max-w-[92vw]">
       <span className="text-[11px] font-extrabold text-[#0F172A] hidden sm:inline-flex items-center gap-1.5 pl-1">
+
         <Sparkles className="w-3.5 h-3.5 text-[#059669] animate-spin" />
         Quick Demo Launch:
       </span>

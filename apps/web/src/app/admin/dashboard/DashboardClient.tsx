@@ -184,25 +184,25 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
 
       {/* AI Query Bar */}
       <GlassCard className="p-4 border-[#0F5A47]/20">
-        <form onSubmit={handleAiSearch} className="flex gap-2">
+        <form onSubmit={handleAiSearch} className="flex flex-col sm:flex-row gap-2.5">
           <input
             type="text"
             placeholder="✨ Ask AI financial questions (e.g., 'What channel collected the most this month?')"
             value={aiQuery}
             onChange={(e) => setAiQuery(e.target.value)}
-            className="flex-1 px-4 py-2 bg-white/70 border border-border-glass rounded-xl text-text-primary focus:outline-none focus:border-[#0F5A47] text-sm"
+            className="flex-1 px-4 py-2.5 bg-white/90 border border-border-glass rounded-xl text-text-primary focus:outline-none focus:border-[#0F5A47] text-base sm:text-sm shadow-xs min-h-[44px]"
           />
           <button
             type="submit"
             disabled={aiLoading}
-            className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white font-medium text-sm shadow-md hover:opacity-95 disabled:opacity-50 transition-all"
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white font-bold text-xs shadow-md hover:opacity-95 disabled:opacity-50 transition-all min-h-[44px] w-full sm:w-auto"
           >
             {aiLoading ? "Thinking…" : "Ask AI"}
           </button>
         </form>
         {aiAnswer && (
-          <div className="mt-3 p-3 bg-[#0F5A47]/10 border border-[#0F5A47]/30 rounded-xl text-sm text-text-primary">
-            <span className="font-semibold text-[#0F5A47]">AI Assistant: </span>
+          <div className="mt-3 p-3 bg-[#0F5A47]/10 border border-[#0F5A47]/30 rounded-xl text-xs sm:text-sm text-text-primary leading-relaxed">
+            <span className="font-bold text-[#0F5A47]">AI Assistant: </span>
             {aiAnswer}
           </div>
         )}
@@ -300,7 +300,7 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
       {/* Embedded Reports Drawer Overlay */}
       {isReportsDrawerOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm transition-opacity">
-          <div className="w-full max-w-xl bg-[#F4F1EA] h-full shadow-2xl overflow-y-auto flex flex-col border-l border-border-glass">
+          <div className="w-full max-w-xl bg-[#F4F1EA] h-full shadow-2xl overflow-y-auto flex flex-col border-l border-border-glass mobile-bottom-sheet">
             <div className="p-6 border-b border-border-glass bg-white/80 backdrop-blur flex justify-between items-center sticky top-0 z-10">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[#0F5A47]/10 flex items-center justify-center text-[#0F5A47]">

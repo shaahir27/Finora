@@ -1,24 +1,40 @@
----
-feature_name: "Receipt Generation & GST Logic"
-session: "Session 6"
-status: "completed"
----
+# Feature: Receipt Generation & GST Logic
 
-## What was built
-- Added `Receipt` model to Prisma schema (with `ReceiptFormat` enum).
-- Added `generateReceipt` server action in `apps/web/src/app/actions/receipts.ts` with 3-phase execution architecture (Phase 1: DB transaction fetches transaction & creates receipt record; Phase 2: React PDF buffer rendered outside DB transaction; Phase 3: Supabase Storage upload / data URL fallback).
-- Implemented GST-inclusive back-calculation formula (`amount * (rate / (100 + rate))`) directly in the receipt generation logic.
-- Snapshots GST treatment and rate into `gstDetails` JSON field at time of generation so historical receipts are immutable.
-- Built Admin Receipts UI (`/admin/receipts`) and Parent History UI (`/parent/history`) to download receipts with strict student-parent ownership verification.
+## 1. Overview
+* **Name:** Receipt Generation & GST Logic
+* **Session:** Session 6 — Polish & Demo
+* **Purpose:** Generates immutable, GST-compliant PDF receipts for posted transactions using a 3-phase execution architecture.
+* **Traces to:** `product_requirements.md` (M-8) and `financial_engine.md`.
 
-## Governing Principles enforced
-- **GST Logic (Principle 5/6 context)**: Strictly enforces GST-inclusive calculation. There is no code path for B2B exclusive pricing.
-- **Transaction Safety**: PDF generation and cloud upload execute outside DB transaction blocks, eliminating transaction timeout risks.
-- **Parent Access**: Parent download requests verify linked student ownership (`guardianOf` relationship) before returning receipts.
+## 2. Technical Rationale
+* **How we achieved it:** 
+  - Phase 1: Short DB transaction locks the assignment, calculates GST-inclusive amounts (`amount * (rate / (100 + rate))`), reserves the `RECEIPT` row, and snapshots `gstDetails` JSON.
+  - Phase 2: Renders PDF stream via `@react-pdf/renderer` outside open DB transaction blocks, eliminating lock holding during cloud upload.
+  - Phase 3: Uploads to Supabase Storage and updates `pdfUrl`.
+* **Alternatives considered:** Generating PDF synchronously inside DB transaction.
+* **Why we chose this path:** Prevents DB transaction timeouts and long table locks during slow PDF rendering/network uploads.
 
-## Database Schema Impact
-- **New Tables**: `RECEIPT` (links 1:1 to `TRANSACTION`).
+## 3. Database Schema Impact
+* **Changes made:**
+  - Added `Receipt` model to Prisma schema with `ReceiptFormat` enum.
+  - Denormalized `schoolId` onto `Receipt` with FK to `School.id` and `@@unique([schoolId, receiptNumber])` to prevent receipt number collisions under concurrency.
+  - Migration `20260726000000_constraints_and_indexes` added to backfill `school_id` and create `receipts_school_id_receipt_number_key` unique index.
 
-## Core Logic & Necessary Functions
-- `generateReceipt(txId, format, requestingUserId)` validates caller permissions (admin for school or parent linked to student), executes 3-phase generation, computes GST, creates `RECEIPT`, and returns `{ pdfUrl, receiptNumber }`.
+## 4. Core Logic & Necessary Functions
+* **List of functions & files:** Key functions added or modified, and their exact file paths.
+  * `generateReceipt` (`apps/web/src/app/actions/receipts.ts`): Validates caller permissions (`requireAdminForSchool` or `requireParentSession` with `guardianOf` check), reserves receipt with `P2002` duplicate receipt number handling, renders PDF, uploads to Supabase, and returns `{ pdfUrl, receiptNumber }`.
+  ```typescript
+  export async function generateReceipt(
+    transactionId: string, format: ReceiptFormat
+  ): Promise<{ pdfUrl: string; receiptNumber: string }>
+  ```
+
+## 5. Testing & Verification
+* **Automated tests:** `apps/web/tests/session6.test.ts` — verifies receipt generation, GST calculation, audit log creation, and authorization check.
+* **Manually verified:** Verified receipt PDF download in browser and Supabase Storage fallback to Data URL.
+
+## 6. Dependencies & Deferred Work
+* **Depends on:** `@react-pdf/renderer`, Supabase Storage (`supabaseAdmin`).
+* **Updates applied in Audit Pass:** Added `schoolId` column & unique constraint `[schoolId, receiptNumber]` in migration, added `P2002` error handling for duplicate receipt number generation.
+
 

@@ -85,21 +85,21 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-bg-base flex flex-col md:flex-row overflow-hidden font-sans">
+    <div className="min-h-dvh bg-bg-base flex flex-col md:flex-row overflow-hidden font-sans">
       <Toaster position="top-center" toastOptions={{ 
         style: { background: 'rgba(255, 255, 255, 0.95)', color: '#0F172A', backdropFilter: 'blur(16px)', border: '1px solid rgba(15, 90, 71, 0.2)' } 
       }} />
       <CopilotWidget schoolId="demo-school-id" />
 
       {/* Mobile Top Bar */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-bg-surface border-b border-border-glass z-40">
+      <div className="md:hidden flex items-center justify-between p-4 bg-bg-surface border-b border-border-glass z-40 sticky top-0 shadow-xs">
         <Link href="/admin/dashboard" className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#0F5A47] to-[#059669] flex items-center justify-center text-white font-bold text-sm shadow-xs">
             F
           </div>
           <h1 className="text-lg font-bold text-text-primary tracking-tight">Finora Admin</h1>
         </Link>
-        <button onClick={() => setIsMobileMenuOpen(true)}>
+        <button onClick={() => setIsMobileMenuOpen(true)} className="p-1 rounded-lg hover:bg-black/5 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Open Admin Menu">
           <Menu className="w-6 h-6 text-text-primary" />
         </button>
       </div>
@@ -113,10 +113,10 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
       )}
 
       {/* Sidebar Navigation */}
-      <div className={`fixed inset-y-0 left-0 z-50 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out md:flex w-64 flex-col bg-bg-surface border-r border-border-glass h-screen`}>
+      <div className={`fixed inset-y-0 left-0 z-50 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition duration-200 ease-in-out md:flex w-64 flex-col bg-bg-surface border-r border-border-glass h-dvh`}>
         {/* Close button on mobile */}
         <div className="md:hidden absolute top-4 right-4 z-50">
-          <button onClick={() => setIsMobileMenuOpen(false)}>
+          <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 rounded-lg hover:bg-black/5 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close Admin Menu">
             <X className="w-6 h-6 text-text-primary" />
           </button>
         </div>
@@ -139,6 +139,7 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
               <NavItem href="/admin/dashboard" icon={LayoutDashboard} onClick={closeMenu}>Executive Dashboard</NavItem>
               <NavItem href="/admin/ledger" icon={BookOpen} onClick={closeMenu}>Finance Operations</NavItem>
               <NavItem href="/admin/students" icon={Users} onClick={closeMenu}>Students & Families</NavItem>
+              <NavItem href="/admin/reminders" icon={BellRing} onClick={closeMenu}>Reminders Queue</NavItem>
             </NavGroup>
           </nav>
 
@@ -148,8 +149,11 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
             <button
               id="admin-logout-btn"
               type="button"
-              onClick={() => signOut({ callbackUrl: "/admin/login" })}
-              className="mt-3 text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
+              onClick={async () => {
+                await signOut({ redirect: false });
+                window.location.href = window.location.origin + "/admin/login";
+              }}
+              className="mt-3 text-xs font-medium text-red-400 hover:text-red-300 transition-colors cursor-pointer"
             >
               Sign out
             </button>
@@ -158,7 +162,7 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto h-[calc(100vh-65px)] md:h-screen relative">
+      <main className="flex-1 overflow-auto min-h-[calc(100dvh-60px)] md:h-screen relative p-3 sm:p-6">
         {children}
       </main>
     </div>

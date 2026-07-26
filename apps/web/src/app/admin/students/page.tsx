@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getStudents } from "@/app/actions/students";
 import { getDefaulters, queueRemindersForStudent, escalateDefaulterScore, batchQueueRemindersAction } from "@/app/actions/defaulters";
-import { narrateDefaulterInsightAction, draftReminderTextAction } from "@/app/actions/ai";
+import { narrateDefaulterInsightAction, draftReminderTextForStudentAction } from "@/app/actions/ai";
 import { createParentAccount } from "@/app/actions/parents";
 import { useDataState } from "@/lib/useDataState";
 import { FiveStateRenderer } from "@/components/FiveStateRenderer";
@@ -83,8 +83,12 @@ export default function StudentsDirectoryPage() {
   const handleGenerateAiDraftText = async (studentId: string, studentName: string) => {
     setDraftingText(true);
     try {
-      const draft = await draftReminderTextAction(schoolId, studentId, "whatsapp");
-      setAiDraftModal({ studentId, studentName, text: draft });
+      const draft = await draftReminderTextForStudentAction(schoolId, studentId, "whatsapp");
+      if (!draft) {
+        toast.error("This student has no overdue balance to draft a reminder for.");
+        return;
+      }
+      setAiDraftModal({ studentId, studentName, text: draft.draftedText });
       toast.success("✨ AI Reminder drafted!");
     } catch {
       toast.error("Failed to draft AI reminder text.");
@@ -280,26 +284,20 @@ export default function StudentsDirectoryPage() {
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="p-3 bg-[#F4F1EA] rounded-xl border border-[#0F5A47]/15 space-y-1">
-                        <span className="text-[10px] font-bold text-[#475569] block">Grade 9 Cohort</span>
-                        <p className="text-lg font-extrabold text-[#059669]">1 Defaulter</p>
-                        <span className="text-[9px] font-bold text-[#059669] block">92% On-Time Pay</span>
-                      </div>
-                      <div className="p-3 bg-[#F4F1EA] rounded-xl border border-[#0F5A47]/15 space-y-1">
-                        <span className="text-[10px] font-bold text-[#475569] block">Grade 10 Cohort</span>
-                        <p className="text-lg font-extrabold text-[#D97706]">2 Defaulters</p>
-                        <span className="text-[9px] font-bold text-[#D97706] block">Medium Risk Band</span>
-                      </div>
-                      <div className="p-3 bg-[#F4F1EA] rounded-xl border border-[#0F5A47]/15 space-y-1">
-                        <span className="text-[10px] font-bold text-[#475569] block">Grade 11 Cohort</span>
-                        <p className="text-lg font-extrabold text-[#DC2626]">4 Defaulters</p>
-                        <span className="text-[9px] font-bold text-[#DC2626] block">High Risk Cluster</span>
-                      </div>
-                      <div className="p-3 bg-[#F4F1EA] rounded-xl border border-[#0F5A47]/15 space-y-1">
-                        <span className="text-[10px] font-bold text-[#475569] block">Grade 12 Cohort</span>
-                        <p className="text-lg font-extrabold text-[#DC2626]">2 Defaulters</p>
-                        <span className="text-[9px] font-bold text-[#DC2626] block">Board Exam Hold</span>
-                      </div>
+                      {Object.entries(
+                        data.reduce((acc: Record<string, number>, d: any) => {
+                          const grade = d.studentClass || "General";
+                          acc[grade] = (acc[grade] || 0) + 1;
+                          return acc;
+                        }, {})
+                      ).map(([grade, count]) => (
+                        <div key={grade} className="p-3 bg-[#F4F1EA] rounded-xl border border-[#0F5A47]/15 space-y-1">
+                          <span className="text-[10px] font-bold text-[#475569] block">Class {grade}</span>
+                          <p className="text-lg font-extrabold text-[#D97706]">
+                            {count as number} Defaulter{(count as number) === 1 ? "" : "s"}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
 

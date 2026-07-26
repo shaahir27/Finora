@@ -34,6 +34,23 @@ async function main() {
     },
   });
 
+  // 2b. Ensure Razorpay Webhook System User exists
+  await prisma.user.upsert({
+    where: { id: "razorpay-webhook-system" },
+    update: {
+      email: "webhook@razorpay.system",
+      role: UserRole.admin,
+      schoolId: school.id,
+    },
+    create: {
+      id: "razorpay-webhook-system",
+      role: UserRole.admin,
+      email: "webhook@razorpay.system",
+      phone: null,
+      schoolId: school.id,
+    },
+  });
+
   // 3. Ensure Parent User exists
   const parentUser = await prisma.user.upsert({
     where: { id: "demo-parent-id" },

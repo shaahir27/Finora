@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma, type FeeAssignment, type GstTreatment } from "@smart-school/db";
+import { requireAdminForSchool } from "@/lib/require-session";
 
 // Helper — strips Prisma Decimal from a FeeType row before it crosses the RSC boundary.
 function serializeFeeType(ft: any) {
@@ -23,6 +24,8 @@ export async function createFeeType(
     gstRate?: number;
   }
 ) {
+  await requireAdminForSchool(schoolId);
+
   if (data.gstTreatment === "taxable" && (data.gstRate === undefined || data.gstRate === null || data.gstRate <= 0)) {
     throw new Error("GST rate is required and must be greater than 0 for taxable fee types.");
   }
@@ -59,6 +62,8 @@ export async function updateFeeSchema(
   const existing = await prisma.feeType.findUnique({ where: { id: feeTypeId } });
   if (!existing) throw new Error("FeeType not found");
 
+  await requireAdminForSchool(existing.schoolId);
+
   const newTreatment = changes.gstTreatment ?? existing.gstTreatment;
   let newRate = changes.gstRate !== undefined ? changes.gstRate : existing.gstRate;
 
@@ -92,6 +97,8 @@ export async function assignFee(
   feeTypeId: string,
   data: { amount: number; dueDate: Date }
 ) {
+  await requireAdminForSchool(schoolId);
+
   const ids = Array.isArray(studentIds) ? studentIds : [studentIds];
   const succeeded: any[] = [];
   const failed: { studentId: string; reason: string }[] = [];

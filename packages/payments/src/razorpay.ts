@@ -153,11 +153,12 @@ export async function verifyRazorpayWebhookSignature(
     .update(rawBody)
     .digest("hex");
 
+  const sigBuffer = Buffer.from(signature || "", "utf-8");
+  const expectedBuffer = Buffer.from(expectedSignature, "utf-8");
+
   if (
-    !crypto.timingSafeEqual(
-      Buffer.from(signature, "utf-8"),
-      Buffer.from(expectedSignature, "utf-8")
-    )
+    sigBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(sigBuffer, expectedBuffer)
   ) {
     // Signature mismatch — reject. Caller must log and return 400.
     throw new Error("Razorpay webhook signature verification failed.");

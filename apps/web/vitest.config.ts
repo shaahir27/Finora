@@ -17,14 +17,16 @@ export default defineConfig({
     // Allow each test file to isolate its own mocks
     isolate: true,
     // Resolve the same path alias as tsconfig.json
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      { find: "@/auth", replacement: path.resolve(__dirname, "./tests/auth-mock.ts") },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
   },
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      { find: "@/auth", replacement: path.resolve(__dirname, "./tests/auth-mock.ts") },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
   },
   // Strip Next.js-specific directives ("use server", "use client") before test execution
   plugins: [

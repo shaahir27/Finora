@@ -11,8 +11,14 @@ import { RISK_CONFIG } from "./config";
  */
 export function evaluateReminderTrigger(
   daysOverdue: number,
-  lastTriggeredTier: number
-): { shouldTrigger: boolean; newTier: number } {
+  lastTriggeredTier: number,
+  options?: { isPaymentInFlight?: boolean }
+): { shouldTrigger: boolean; newTier: number; reason?: string } {
+  // Smart Reminder Muting: suppress reminders if payment is currently in-flight
+  if (options?.isPaymentInFlight) {
+    return { shouldTrigger: false, newTier: lastTriggeredTier, reason: "payment_in_flight" };
+  }
+
   if (daysOverdue < RISK_CONFIG.REMINDER_TIER_1_START) {
     return { shouldTrigger: false, newTier: lastTriggeredTier };
   }

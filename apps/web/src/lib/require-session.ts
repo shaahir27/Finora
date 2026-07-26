@@ -1,4 +1,4 @@
-import { auth } from "../../auth";
+import { auth } from "@/auth";
 import { DEMO_SCHOOL_ID } from "./school-context";
 
 export class UnauthorizedError extends Error {
@@ -8,15 +8,19 @@ export class UnauthorizedError extends Error {
   }
 }
 
+// Only true if someone has deliberately opted in to unauthenticated local testing —
+// never true by default, and NEVER set this in any shared/staging/production environment.
+const ALLOW_UNAUTHENTICATED_DEMO_ACTIONS =
+  process.env.ALLOW_UNAUTHENTICATED_DEMO_ACTIONS === "true" || process.env.NODE_ENV === "test";
+
 /**
  * Requires an active admin session matching the requested schoolId.
- * If NODE_ENV !== 'production' and no session exists, falls back to DEMO_SCHOOL_ID for demo compatibility.
  */
 export async function requireAdminForSchool(schoolId: string): Promise<{ adminId: string; schoolId: string }> {
   const session = await auth();
 
   if (!session?.user) {
-    if (process.env.NODE_ENV !== "production") {
+    if (ALLOW_UNAUTHENTICATED_DEMO_ACTIONS) {
       return { adminId: "seed-admin-01", schoolId: DEMO_SCHOOL_ID };
     }
     throw new UnauthorizedError("Authentication required.");
@@ -37,13 +41,12 @@ export async function requireAdminForSchool(schoolId: string): Promise<{ adminId
 
 /**
  * Requires an active parent session.
- * If NODE_ENV !== 'production' and no session exists, falls back to demo parent session.
  */
 export async function requireParentSession(): Promise<{ parentUserId: string; parentLinkId: string; schoolId: string }> {
   const session = await auth();
 
   if (!session?.user) {
-    if (process.env.NODE_ENV !== "production") {
+    if (ALLOW_UNAUTHENTICATED_DEMO_ACTIONS) {
       return {
         parentUserId: "demo-parent-id",
         parentLinkId: "parent-link-demo-id",
@@ -64,3 +67,4 @@ export async function requireParentSession(): Promise<{ parentUserId: string; pa
     schoolId: user.schoolId || DEMO_SCHOOL_ID,
   };
 }
+

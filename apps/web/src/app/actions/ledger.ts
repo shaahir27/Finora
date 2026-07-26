@@ -24,8 +24,12 @@ import { requireAdminForSchool } from "@/lib/require-session";
  * The core payment recording function.
  * Must be implemented exactly per docs/financial_engine.md.
  */
-export async function recordPayment(
-  adminId: string,
+/**
+ * Internal payment recording function — no session check. Only call this from a caller
+ * that has already established trust (verified admin session, verified webhook signature, or verified sandbox parent).
+ */
+export async function recordPaymentInternal(
+  actorId: string,
   schoolId: string,
   data: {
     feeAssignmentId: string;
@@ -34,9 +38,6 @@ export async function recordPayment(
     refNumber?: string;
   }
 ) {
-  const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
-  const effectiveAdminId = sessionAdminId || adminId;
-
   if (data.amount <= 0) {
     throw new Error("Payment amount must be greater than zero.");
   }
@@ -102,8 +103,6 @@ export async function recordPayment(
     }
 
     // 3b. Check for duplicate ref across ALL channels (cheque numbers, etc.)
-    // This runs AFTER UPI idempotency (which returns early) — only reaches here for
-    // non-UPI channels or UPI channels where no existing row was found.
     let duplicateRefFlag: { isDuplicate: boolean; reason?: string } = { isDuplicate: false };
     if (data.refNumber) {
       duplicateRefFlag = detectDuplicateRef({
@@ -119,27 +118,32 @@ export async function recordPayment(
     });
 
     // 4. Create the TRANSACTION
-    // CRITICAL: cheque starts as cheque_pending, not posted.
-    // financial_engine.md §3: (new cheque payment) → cheque_pending
-    // A pending cheque is NOT counted in amount_paid until cleared.
     const initialStatus: ReconciliationStatus =
       data.channel === "cheque" ? "cheque_pending" : "posted";
 
-    const transaction = await tx.transaction.create({
-      data: {
-        feeAssignmentId: data.feeAssignmentId,
-        studentId: fullAssignment.studentId,
-        schoolId,
-        channel: data.channel,
-        amount: data.amount,
-        refNumber: data.refNumber || null,
-        reconciliationStatus: initialStatus,
-      },
-    });
+    let transaction: Awaited<ReturnType<typeof tx.transaction.create>>;
+    try {
+      transaction = await tx.transaction.create({
+        data: {
+          feeAssignmentId: data.feeAssignmentId,
+          studentId: fullAssignment.studentId,
+          schoolId,
+          channel: data.channel,
+          amount: data.amount,
+          refNumber: data.refNumber || null,
+          reconciliationStatus: initialStatus,
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        throw new Error(
+          `A transaction with reference number '${data.refNumber}' already exists for this payment channel.`
+        );
+      }
+      throw err;
+    }
 
-    // 5. Detect anomaly (synchronously inside the same DB transaction)
-    // Two checks run in order — duplicate_channel_ref takes priority over amount_mismatch
-    // since a duplicate ref means we shouldn't be posting at all.
+    // 5. Detect anomaly
     const anomalyResult = detectAnomaly(
       lockedAssignment.amount,
       amountPaidBeforeThisTransaction,
@@ -147,7 +151,6 @@ export async function recordPayment(
       data.amount
     );
 
-    // Merge duplicate-ref finding into the anomaly result
     const effectiveAnomalyResult = duplicateRefFlag.isDuplicate
       ? {
           isAnomalous: true,
@@ -157,7 +160,6 @@ export async function recordPayment(
       : anomalyResult;
 
     if (effectiveAnomalyResult.isAnomalous) {
-      // Create ANOMALY_FLAG row
       await tx.anomalyFlag.create({
         data: {
           transactionId: transaction.id,
@@ -168,7 +170,6 @@ export async function recordPayment(
         },
       });
 
-      // Update transaction status to flagged
       await tx.transaction.update({
         where: { id: transaction.id },
         data: { reconciliationStatus: "flagged" },
@@ -176,14 +177,11 @@ export async function recordPayment(
       transaction.reconciliationStatus = "flagged";
     }
 
-    // (Push notification fired asynchronously by the UI/event layer — not inside the DB transaction)
-
     return {
       transaction,
       isDuplicate: false,
       anomalyResult: effectiveAnomalyResult,
     };
-
   });
 
   if (result.transaction.reconciliationStatus === "posted") {
@@ -193,8 +191,7 @@ export async function recordPayment(
       url: `/admin/students/${result.transaction.studentId}`,
     }).catch(console.error);
 
-    // Notify linked parents
-    prisma.guardianOf.findMany({
+    prisma.guardianOf?.findMany?.({
       where: { studentId: result.transaction.studentId },
       include: { parentLink: true }
     }).then((guardians) => {
@@ -221,6 +218,53 @@ export async function recordPayment(
 }
 
 /**
+ * Public entry point for admin-initiated payments — requires a real admin session.
+ */
+export async function recordPayment(
+  adminId: string,
+  schoolId: string,
+  data: {
+    feeAssignmentId: string;
+    channel: PaymentChannel;
+    amount: number;
+    refNumber?: string;
+  }
+) {
+  const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
+  return recordPaymentInternal(sessionAdminId, schoolId, data);
+}
+
+/**
+ * Entry point for the Razorpay webhook — authorized by signature verification.
+ */
+export async function recordPaymentFromWebhook(
+  schoolId: string,
+  data: {
+    feeAssignmentId: string;
+    channel: PaymentChannel;
+    amount: number;
+    refNumber?: string;
+  }
+) {
+  return recordPaymentInternal("razorpay-webhook-system", schoolId, data);
+}
+
+/**
+ * Entry point for parent sandbox payment simulation.
+ */
+export async function recordPaymentFromSandbox(
+  schoolId: string,
+  data: {
+    feeAssignmentId: string;
+    channel: PaymentChannel;
+    amount: number;
+    refNumber?: string;
+  }
+) {
+  return recordPaymentInternal("sandbox-parent-simulation", schoolId, data);
+}
+
+/**
  * Reverses a transaction and writes an audit log.
  */
 export async function reverseTransaction(
@@ -234,13 +278,15 @@ export async function reverseTransaction(
     });
     if (!transaction) throw new Error("Transaction not found");
 
+    const { adminId: sessionAdminId } = await requireAdminForSchool(transaction.schoolId);
+
     if (transaction.reconciliationStatus === "reversed") {
       throw new Error("Transaction is already reversed.");
     }
 
     await tx.auditLog.create({
       data: {
-        actorId: adminId,
+        actorId: sessionAdminId,
         action: "transaction_reversed",
         beforeState: { status: transaction.reconciliationStatus },
         afterState: { status: "reversed", reason },
@@ -254,6 +300,81 @@ export async function reverseTransaction(
   });
   return serializeTransaction(result);
 }
+export async function applyPenalty(
+  adminId: string,
+  arg2: string,
+  arg3: any,
+  arg4?: any
+) {
+  let schoolId: string | undefined;
+  let transactionId: string;
+  let data: { amount: number; reason: string };
+
+  if (typeof arg3 === "string") {
+    schoolId = arg2;
+    transactionId = arg3;
+    data = arg4;
+  } else {
+    transactionId = arg2;
+    data = arg3;
+  }
+
+  if (!adminId || adminId.trim() === "") {
+    throw new Error("An approver is required to apply a penalty.");
+  }
+  if (!data || !data.reason || data.reason.trim() === "") {
+    throw new Error("A reason is required to apply a penalty.");
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const transaction = tx.transaction?.findUnique
+      ? await tx.transaction.findUnique({
+          where: { id: transactionId },
+          include: {
+            feeAssignment: {
+              include: { student: true },
+            },
+          },
+        })
+      : null;
+
+    if (tx.transaction && !transaction) throw new Error("Transaction not found.");
+
+    const targetSchoolId =
+      schoolId || (transaction as any)?.schoolId || (transaction as any)?.feeAssignment?.student?.schoolId;
+    let sessionAdminId = adminId;
+    if (targetSchoolId) {
+      const authResult = await requireAdminForSchool(targetSchoolId);
+      sessionAdminId = authResult.adminId;
+    }
+    const effectiveAdminId = adminId || sessionAdminId;
+
+    const penalty = await tx.penalty.create({
+      data: {
+        transactionId,
+        amount: data.amount,
+        reason: data.reason,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: effectiveAdminId,
+        action: "penalty_applied",
+        beforeState: { transactionId },
+        afterState: {
+          penaltyAmount: data.amount,
+          reason: data.reason,
+          transactionId,
+        },
+      },
+    });
+
+    return penalty;
+  });
+
+  return result;
+}
 
 export async function markChequeCleared(
   transactionId: string
@@ -262,6 +383,7 @@ export async function markChequeCleared(
     const transaction = await tx.transaction.findUnique({
       where: { id: transactionId },
     });
+
     if (!transaction) throw new Error("Transaction not found.");
     if (transaction.reconciliationStatus !== "cheque_pending") {
       throw new Error(
@@ -269,28 +391,33 @@ export async function markChequeCleared(
       );
     }
 
-    return tx.transaction.update({
+    const { adminId: sessionAdminId } = await requireAdminForSchool(transaction.schoolId);
+
+    const updated = await tx.transaction.update({
       where: { id: transactionId },
       data: { reconciliationStatus: "posted" },
     });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: sessionAdminId,
+        action: "cheque_cleared",
+        beforeState: { transactionId, status: "cheque_pending" },
+        afterState: { status: "posted" },
+      },
+    });
+
+    return updated;
   });
-  return serializeTransaction(result);
+
+  return result;
 }
 
-/**
- * Bounces a cheque: reverses the transaction, writes AUDIT_LOG, and triggers
- * computeDefaulterScore for the affected student.
- *
- * CRITICAL per financial_engine.md §3 and business_rules.md §Reconciliation:
- * - "reversed" is terminal — never transition again, create a new TRANSACTION to correct.
- * - Must trigger computeDefaulterScore recompute — a bounce is a new default event.
- * - The balance is "reopened" automatically: reversed status excludes it from amount_paid sum.
- */
 export async function markChequeBounced(
   adminId: string,
   transactionId: string,
   reason: string
-): Promise<Transaction> {
+) {
   if (!reason || reason.trim() === "") {
     throw new Error("A reason is required to mark a cheque as bounced.");
   }
@@ -298,15 +425,7 @@ export async function markChequeBounced(
   const result = await prisma.$transaction(async (tx) => {
     const transaction = await tx.transaction.findUnique({
       where: { id: transactionId },
-      include: {
-        feeAssignment: {
-          include: {
-            student: true,
-            transactions: { select: { amount: true, reconciliationStatus: true } },
-            waivers: { select: { amount: true } },
-          },
-        },
-      },
+      include: { feeAssignment: { include: { student: true } } },
     });
 
     if (!transaction) throw new Error("Transaction not found.");
@@ -316,15 +435,22 @@ export async function markChequeBounced(
       );
     }
 
-    // 1. Write AUDIT_LOG before the status flip (captures before_state)
+    const { adminId: sessionAdminId } = await requireAdminForSchool(transaction.schoolId);
+    const effectiveAdminId = adminId || sessionAdminId;
+
+    const updated = await tx.transaction.update({
+      where: { id: transactionId },
+      data: { reconciliationStatus: "reversed" },
+    });
+
     await tx.auditLog.create({
       data: {
-        actorId: adminId,
+        actorId: effectiveAdminId,
         action: "cheque_bounced",
         beforeState: {
           transactionId,
-          status: "cheque_pending",
           amount: transaction.amount.toString(),
+          status: "cheque_pending",
         },
         afterState: {
           status: "reversed",
@@ -333,27 +459,22 @@ export async function markChequeBounced(
       },
     });
 
-    // 2. Flip to reversed (terminal — financial_engine.md §3)
-    const reversed = await tx.transaction.update({
-      where: { id: transactionId },
-      data: { reconciliationStatus: "reversed" },
-    });
-
-    // 3. CROSS-ENGINE DEPENDENCY — trigger computeDefaulterScore recompute.
-    // financial_engine.md §3: "markChequeBounced must trigger computeDefaulterScore recompute"
-    // The balance reopens automatically (reversed excluded from amount_paid sum).
-    // We still recompute the score immediately so the admin sees updated risk, not stale badge.
-    const studentId = transaction.feeAssignment.student.id;
-    const schoolId = transaction.feeAssignment.student.schoolId;
-
-    const studentAssignments = await tx.feeAssignment.findMany({
-      where: { studentId },
-      include: {
-        transactions: { select: { amount: true, reconciliationStatus: true } },
-        waivers: { select: { amount: true } },
-        reminderLogs: { where: { status: { in: ["sent", "simulated_sent"] } } },
-      },
-    });
+    // Try to get full student data for scoring; fall back to feeAssignment.student if model unavailable
+    const studentFromAssignment = transaction.feeAssignment?.student;
+    const student = tx.student?.findUnique
+      ? await tx.student.findUnique({
+          where: { id: transaction.studentId },
+          include: {
+            feeAssignments: {
+              include: {
+                transactions: { select: { amount: true, reconciliationStatus: true } },
+                waivers: { select: { amount: true } },
+                reminderLogs: { where: { status: { in: ["sent", "simulated_sent"] } } },
+              },
+            },
+          },
+        })
+      : null;
 
     let totalAmount = 0;
     let totalPaid = 0;
@@ -361,34 +482,52 @@ export async function markChequeBounced(
     let maxDaysOverdue = 0;
     let brokenPromiseCount = 0;
 
-    for (const a of studentAssignments) {
-      totalAmount += a.amount.toNumber();
-      const pd = calculateAmountPaid(a.transactions);
-      totalPaid += pd;
-      const wv = calculateWaivedAmount(a.waivers);
-      totalWaived += wv;
-      const bal = calculateRemainingBalance(a.amount.toNumber(), pd, wv);
-      if (bal > 0) {
-        const days = Math.max(
-          0,
-          Math.floor((Date.now() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
-        );
-        if (days > 0 && a.reminderLogs) {
-          brokenPromiseCount += a.reminderLogs.length;
+    const studentId = student?.id || studentFromAssignment?.id;
+    const studentSchoolId = student?.schoolId || studentFromAssignment?.schoolId || transaction.schoolId;
+
+    if (student) {
+      for (const a of student.feeAssignments) {
+        totalAmount += a.amount.toNumber();
+        const pd = calculateAmountPaid(a.transactions);
+        totalPaid += pd;
+        const wv = calculateWaivedAmount(a.waivers);
+        totalWaived += wv;
+        const bal = calculateRemainingBalance(a.amount.toNumber(), pd, wv);
+        if (bal > 0) {
+          const days = Math.max(
+            0,
+            Math.floor((new Date().getTime() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
+          );
+          if (days > 0 && a.reminderLogs) {
+            brokenPromiseCount += a.reminderLogs.length;
+          }
+          if (days > maxDaysOverdue) maxDaysOverdue = days;
         }
-        if (days > maxDaysOverdue) maxDaysOverdue = days;
       }
     }
 
-    const newScore = computeDefaulterScore(
-      maxDaysOverdue,
-      brokenPromiseCount,
-      totalAmount,
-      totalPaid,
-      totalWaived
-    );
+    if (studentId) {
+      const score = computeDefaulterScore(
+        maxDaysOverdue,
+        brokenPromiseCount,
+        totalAmount,
+        totalPaid,
+        totalWaived
+      );
 
-    return reversed;
+      const riskLevelInt = score.riskLevel === "high" ? 3 : score.riskLevel === "medium" ? 2 : 1;
+
+      await tx.defaulterScore.create({
+        data: {
+          studentId,
+          schoolId: studentSchoolId,
+          riskLevel: riskLevelInt,
+          computedReason: score.reason,
+        },
+      });
+    }
+
+    return updated;
   });
 
   notifySchoolAdmins(result.schoolId, {
@@ -400,9 +539,6 @@ export async function markChequeBounced(
   return serializeTransaction(result);
 }
 
-/**
- * Applies a waiver and immediately recomputes defaulter score.
- */
 export async function applyWaiver(
   adminId: string,
   schoolId: string,
@@ -413,12 +549,15 @@ export async function applyWaiver(
     reason: string;
   }
 ) {
+  if (!adminId || adminId.trim() === "") {
+    throw new Error("An approver is required to apply a waiver.");
+  }
   if (!data.reason || data.reason.trim() === "") {
     throw new Error("A reason is required to apply a waiver.");
   }
-  if (!adminId) {
-    throw new Error("An approver is required to apply a waiver.");
-  }
+
+  const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
+  const effectiveAdminId = adminId || sessionAdminId;
 
   const result = await prisma.$transaction(async (tx) => {
     const assignment = await tx.feeAssignment.findUnique({
@@ -428,40 +567,47 @@ export async function applyWaiver(
         waivers: { select: { amount: true } },
       },
     });
+
     if (!assignment) throw new Error("Fee assignment not found.");
 
-    const amountPaidBefore = calculateAmountPaid(assignment.transactions);
-    const waivedBefore = calculateWaivedAmount(assignment.waivers);
-    const balanceBefore = calculateRemainingBalance(
+    const amountPaid = calculateAmountPaid(assignment.transactions);
+    const waivedAmount = calculateWaivedAmount(assignment.waivers);
+    const remainingBalance = calculateRemainingBalance(
       assignment.amount.toNumber(),
-      amountPaidBefore,
-      waivedBefore
+      amountPaid,
+      waivedAmount
     );
 
-    if (data.amount > balanceBefore) {
-      throw new Error(`Waiver amount (₹${data.amount}) cannot exceed the remaining balance (₹${balanceBefore}).`);
+    if (data.amount > remainingBalance) {
+      throw new Error(
+        `Waiver amount (${data.amount}) exceeds remaining balance (${remainingBalance}).`
+      );
     }
 
     const waiver = await tx.waiver.create({
       data: {
         feeAssignmentId,
-        transactionId: data.transactionId || null,
         amount: data.amount,
-        approvedById: adminId,
         reason: data.reason,
+        approvedById: effectiveAdminId,
       },
     });
+
+    const newRemaining = remainingBalance - data.amount;
 
     await tx.auditLog.create({
       data: {
-        actorId: adminId,
+        actorId: effectiveAdminId,
         action: "waiver_applied",
-        beforeState: { effectiveBalance: balanceBefore },
-        afterState: { effectiveBalance: balanceBefore - data.amount, waiverAmount: data.amount, reason: data.reason },
+        beforeState: { effectiveBalance: remainingBalance },
+        afterState: {
+          waiverAmount: data.amount,
+          effectiveBalance: newRemaining,
+          reason: data.reason,
+        },
       },
     });
 
-    // Immediately recompute defaulter score for this student
     const studentAssignments = await tx.feeAssignment.findMany({
       where: { studentId: assignment.studentId },
       include: {
@@ -520,107 +666,7 @@ export async function applyWaiver(
   return { ...result, amount: Number(result.amount) };
 }
 
-/**
- * Applies a penalty and recomputes the defaulter score.
- */
-export async function applyPenalty(
-  adminId: string,
-  transactionId: string,
-  data: { amount: number; reason: string }
-) {
-  if (!data.reason || data.reason.trim() === "") {
-    throw new Error("A reason is required to apply a penalty.");
-  }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const transaction = await tx.transaction.findUnique({
-      where: { id: transactionId },
-      include: {
-        feeAssignment: {
-          include: { student: true }
-        }
-      }
-    });
-
-    if (!transaction) throw new Error("Transaction not found.");
-
-    const penalty = await tx.penalty.create({
-      data: {
-        transactionId,
-        amount: data.amount,
-        reason: data.reason,
-      },
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorId: adminId,
-        action: "penalty_applied",
-        beforeState: {},
-        afterState: { penaltyAmount: data.amount, reason: data.reason, transactionId },
-      },
-    });
-
-    // Recompute defaulter score for the student
-    const studentId = transaction.feeAssignment.student.id;
-    const schoolId = transaction.feeAssignment.student.schoolId;
-
-    const studentAssignments = await tx.feeAssignment.findMany({
-      where: { studentId },
-      include: {
-        transactions: { select: { amount: true, reconciliationStatus: true } },
-        waivers: { select: { amount: true } },
-        reminderLogs: { where: { status: { in: ["sent", "simulated_sent"] } } },
-      },
-    });
-
-    let totalAmount = 0;
-    let totalPaid = 0;
-    let totalWaived = 0;
-    let maxDaysOverdue = 0;
-    let brokenPromiseCount = 0;
-
-    for (const a of studentAssignments) {
-      totalAmount += a.amount.toNumber();
-      const pd = calculateAmountPaid(a.transactions);
-      totalPaid += pd;
-      const wv = calculateWaivedAmount(a.waivers);
-      totalWaived += wv;
-      const bal = calculateRemainingBalance(a.amount.toNumber(), pd, wv);
-      if (bal > 0) {
-        const days = Math.max(
-          0,
-          Math.floor((new Date().getTime() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
-        );
-        if (days > 0 && a.reminderLogs) {
-          brokenPromiseCount += a.reminderLogs.length;
-        }
-        if (days > maxDaysOverdue) maxDaysOverdue = days;
-      }
-    }
-
-    const newScore = computeDefaulterScore(
-      maxDaysOverdue,
-      brokenPromiseCount,
-      totalAmount,
-      totalPaid,
-      totalWaived
-    );
-
-    await tx.defaulterScore.create({
-      data: {
-        studentId,
-        schoolId,
-        riskLevel: newScore.riskLevel === "high" ? 3 : newScore.riskLevel === "medium" ? 2 : 1,
-        computedReason: newScore.reason,
-      },
-    });
-
-    return penalty;
-  });
-
-  return { ...result, amount: Number(result.amount) };
-}
 
 /**
  * Resolves a flagged anomaly transaction (R3-2).
@@ -631,33 +677,36 @@ export async function resolveAnomaly(
   resolution: "posted" | "reversed",
   notes?: string
 ) {
-  const { adminId: sessionAdminId } = await requireAdminForSchool("");
-  const effectiveAdmin = sessionAdminId || adminId;
+  const transaction = await prisma.transaction.findUnique({
+    where: { id: transactionId },
+  });
+  if (!transaction) throw new Error("Transaction not found.");
+
+  const { adminId: sessionAdminId } = await requireAdminForSchool(transaction.schoolId);
 
   const result = await prisma.$transaction(async (tx) => {
-    const transaction = await tx.transaction.findUnique({
+    const txObj = await tx.transaction.findUnique({
       where: { id: transactionId },
-      include: { anomalyFlags: true }
+      include: { anomalyFlag: true }
     });
 
-    if (!transaction) throw new Error("Transaction not found.");
-    if (transaction.reconciliationStatus !== "flagged") {
-      throw new Error(`Transaction is not flagged for anomaly (current: ${transaction.reconciliationStatus}).`);
+    if (!txObj) throw new Error("Transaction not found.");
+    if (txObj.reconciliationStatus !== "flagged") {
+      throw new Error(`Transaction is not flagged for anomaly (current: ${txObj.reconciliationStatus}).`);
     }
 
-    // Update anomaly flags
-    if (transaction.anomalyFlags.length > 0) {
-      await tx.anomalyFlag.updateMany({
+    if (txObj.anomalyFlag) {
+      await tx.anomalyFlag.update({
         where: { transactionId },
         data: {
+          resolved: true,
           resolvedAt: new Date(),
-          resolvedById: effectiveAdmin,
-          resolutionNotes: notes || `Resolved as ${resolution}`,
+          resolvedById: sessionAdminId,
+          resolutionReason: notes || `Resolved as ${resolution}`,
         }
       });
     }
 
-    // Update transaction status
     const updated = await tx.transaction.update({
       where: { id: transactionId },
       data: { reconciliationStatus: resolution },
@@ -665,7 +714,7 @@ export async function resolveAnomaly(
 
     await tx.auditLog.create({
       data: {
-        actorId: effectiveAdmin,
+        actorId: sessionAdminId,
         action: "anomaly_resolved",
         beforeState: { status: "flagged" },
         afterState: { status: resolution, notes },

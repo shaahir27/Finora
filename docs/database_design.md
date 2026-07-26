@@ -250,8 +250,10 @@ Previously stated only as prose in `system_architecture.md`'s scalability notes;
 - `PENALTY.reason`: `NOT NULL`.
 - `OCR_STAGING.confirmed`: defaults `false`; no trigger or application path may set `confirmed_transaction_id` without `confirmed = true` first.
 - `TRANSACTION.amount`: `CHECK (amount > 0)` — zero/negative amounts must never reach this table.
-- `TRANSACTION.ref_number`: unique constraint scoped to `channel = 'upi'` — the database-level backstop for webhook idempotency, in addition to the application-level check.
-- `REMINDER_LOG (fee_assignment_id, tier)`: unique constraint. `FEE_ASSIGNMENT.last_triggered_tier` prevents re-firing a tier in the normal single-job-run flow, but does not by itself stop a concurrent or retried job execution from writing a duplicate row for the same tier before the first run's `UPDATE` commits. This constraint is the database-level backstop for that race, added during Phase 8 design-audit remediation.
+- `TRANSACTION.ref_number`: unique constraint scoped to `channel = 'upi'` — partial index database-level backstop for webhook idempotency.
+- `STUDENT.admission_number`: unique constraint scoped to `(school_id, admission_number)` — partial index preventing duplicate admission numbers within a school.
+- `RECEIPT.receipt_number`: unique constraint scoped to `(school_id, receipt_number)` — per-school unique receipt number preventing receipt collisions under concurrency.
+- `REMINDER_LOG (fee_assignment_id, tier)`: unique constraint. `FEE_ASSIGNMENT.last_triggered_tier` prevents re-firing a tier in the normal single-job-run flow.
 
 ## Assumptions
 
