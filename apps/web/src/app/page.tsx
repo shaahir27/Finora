@@ -262,7 +262,7 @@ function Navbar() {
 
       <div className="flex items-center gap-2 sm:gap-3">
         <Link
-          href="/parent/dues"
+          href="/parent"
           className="text-xs font-bold px-3 py-2 rounded-xl text-[#0F172A] bg-white border border-[#0F5A47]/20 hover:bg-[#0F5A47]/10 transition-all flex items-center gap-1.5 shadow-xs"
         >
           <Smartphone className="w-3.5 h-3.5 text-[#0F5A47]" />
@@ -270,7 +270,7 @@ function Navbar() {
           <span className="sm:hidden">Parent</span>
         </Link>
         <Link
-          href="/admin/dashboard"
+          href="/admin"
           className="text-xs font-extrabold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white hover:opacity-95 border border-[#0F5A47]/20 transition-all shadow-md shadow-[#0F5A47]/20 flex items-center gap-1.5 group"
         >
           <Shield className="w-3.5 h-3.5" />
@@ -331,14 +331,14 @@ function Hero() {
             className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4"
           >
             <Link
-              href="/admin/dashboard"
+              href="/admin"
               className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white font-extrabold hover:shadow-xl hover:shadow-[#0F5A47]/25 active:scale-95 transition-all flex items-center justify-center gap-2 group border border-[#0F5A47]/20"
             >
               Launch Admin Operations
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
-              href="/parent/dues"
+              href="/parent"
               className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F172A] font-bold hover:bg-[#0F5A47]/5 transition-colors text-center shadow-xs"
             >
               Test Parent Cockpit
