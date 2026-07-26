@@ -78,8 +78,8 @@ export async function generateReceipt(
     try {
       receipt = await tx.receipt.create({
         data: {
-          transactionId,
-          schoolId: transaction.schoolId,
+          transaction: { connect: { id: transactionId } },
+          school: { connect: { id: transaction.schoolId } },
           format,
           receiptNumber,
           gstAmount,
