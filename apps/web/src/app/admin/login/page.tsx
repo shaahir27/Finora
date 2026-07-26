@@ -1,25 +1,25 @@
 "use client";
 
-/**
- * Admin Login Page — /admin/login
- *
- * Demo-mode login gate. Uses hardcoded credentials for the hackathon demo.
- * Real Supabase Auth for admins is a Session 6 scope item.
- *
- * Credentials: admin@school.edu / demo1234
- *
- * On success: sets sessionStorage flag "finora_admin_authed" and redirects
- * to /admin/dashboard. The admin layout reads this flag on every page load.
- */
-
 import { useState, useId } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import {
+  Shield,
+  ArrowLeft,
+  ArrowRight,
+  Zap,
+  Lock,
+  Sparkles,
+  CheckCircle2,
+  FileCode2,
+  Bot,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 
 const DEMO_EMAIL = "admin@school.edu";
 const DEMO_PASSWORD = "demo1234";
-const SESSION_KEY = "finora_admin_authed";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -30,13 +30,18 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const formId = useId();
 
+  const handleFillDemo = () => {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    // Simulate a brief network delay for realism
-    await new Promise((r) => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 400));
 
     const result = await signIn("admin-login", {
       email: email.trim().toLowerCase(),
@@ -45,7 +50,7 @@ export default function AdminLoginPage() {
     });
 
     if (result?.error) {
-      setError("Invalid email or password. Try admin@school.edu / demo1234");
+      setError("Invalid email or password. Use admin@school.edu / demo1234");
       setIsLoading(false);
     } else {
       router.replace("/admin/dashboard");
@@ -53,212 +58,150 @@ export default function AdminLoginPage() {
   };
 
   return (
-      <div
-      className="min-h-screen flex items-center justify-center p-4 relative"
-      style={{
-        background: "var(--color-bg-base)",
-        fontFamily: "'Inter', sans-serif",
-      }}
-    >
-      <Link 
-        href="/" 
-        className="absolute top-6 left-6 z-50 text-sm font-medium text-text-primary/60 hover:text-text-primary flex items-center gap-2 transition-colors"
-      >
-        <span>←</span> Back to Home
-      </Link>
-      {/* Background glow orbs */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: "-20%",
-            left: "-10%",
-            width: "50vw",
-            height: "50vw",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(45,106,79,0.18) 0%, transparent 70%)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: "-10%",
-            right: "-10%",
-            width: "40vw",
-            height: "40vw",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(76,175,130,0.12) 0%, transparent 70%)",
-          }}
-        />
+    <div className="min-h-screen bg-[#F4F1EA] flex flex-col justify-between p-4 sm:p-6 lg:p-12 relative font-sans">
+      {/* Top Header Back Button */}
+      <div className="flex justify-between items-center w-full max-w-6xl mx-auto z-20">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-xs font-bold text-[#475569] hover:text-[#0F5A47] bg-white/80 px-3.5 py-2 rounded-xl border border-[#0F5A47]/15 transition-all shadow-xs"
+        >
+          <ArrowLeft className="w-4 h-4 text-[#0F5A47]" />
+          Back to Home
+        </Link>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#0F5A47] to-[#0D7A5F] flex items-center justify-center font-extrabold text-white text-xs">
+            F
+          </div>
+          <span className="font-extrabold text-sm text-[#0F172A] tracking-tight">Finora OS</span>
+        </div>
       </div>
 
-      <div className="w-full max-w-md relative">
-        {/* Logo / Brand */}
-        <div className="text-center mb-8">
-          <div
-            className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center text-2xl"
-            style={{ background: "linear-gradient(135deg, #4CAF82, #2D6A4F)", boxShadow: "0 8px 32px rgba(76,175,130,0.3)" }}
-            aria-hidden="true"
-          >
-            ₹
+      {/* Main Split Container */}
+      <div className="w-full max-w-5xl mx-auto my-auto py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center z-10">
+        {/* Left Side Visual Feature Highlights (Desktop/Laptop) */}
+        <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0F5A47]/10 border border-[#0F5A47]/20 text-[#0F5A47] text-xs font-extrabold">
+            <Shield className="w-4 h-4" />
+            Finora Admin Operations Gateway
           </div>
-          <h1 className="text-3xl font-bold text-text-primary tracking-tight">Finora</h1>
-          <p className="text-text-secondary text-sm mt-1">School Finance Platform</p>
+
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#0F172A] tracking-tight leading-tight">
+            School Finance <br className="hidden sm:inline" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0F5A47] to-[#059669]">
+              Control Center.
+            </span>
+          </h1>
+
+          <p className="text-xs sm:text-sm text-[#475569] font-medium leading-relaxed max-w-md mx-auto lg:mx-0">
+            Access real-time reconciliation dashboards, Tally Prime XML export generators, AI defaulter reminder queues, and audit logs.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[#0F172A] font-bold text-left max-w-md mx-auto lg:mx-0">
+            <div className="p-3.5 bg-white/80 rounded-2xl border border-[#0F5A47]/15 flex items-center gap-2.5 shadow-xs">
+              <Zap className="w-4 h-4 text-[#059669] shrink-0" />
+              <span>0ms Bank Sync Lag</span>
+            </div>
+            <div className="p-3.5 bg-white/80 rounded-2xl border border-[#0F5A47]/15 flex items-center gap-2.5 shadow-xs">
+              <FileCode2 className="w-4 h-4 text-[#0F5A47] shrink-0" />
+              <span>Tally Prime XML Export</span>
+            </div>
+            <div className="p-3.5 bg-white/80 rounded-2xl border border-[#0F5A47]/15 flex items-center gap-2.5 shadow-xs">
+              <Bot className="w-4 h-4 text-[#059669] shrink-0" />
+              <span>AI Copilot Engine</span>
+            </div>
+            <div className="p-3.5 bg-white/80 rounded-2xl border border-[#0F5A47]/15 flex items-center gap-2.5 shadow-xs">
+              <CheckCircle2 className="w-4 h-4 text-[#0F5A47] shrink-0" />
+              <span>Audit-Backed Concessions</span>
+            </div>
+          </div>
         </div>
 
-        {/* Login card */}
-        <div
-          className="rounded-2xl p-8 space-y-6"
-          style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            backdropFilter: "blur(20px)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-          }}
-        >
-          <div>
-            <h2 className="text-xl font-semibold text-text-primary">Admin Sign In</h2>
-            <p className="text-sm text-text-secondary mt-1">
-              Sign in to your admin dashboard
-            </p>
-          </div>
-
-          <form id={formId} onSubmit={handleSubmit} className="space-y-4" aria-label="Admin login form">
-            {/* Email */}
-            <div className="space-y-1.5">
-              <label htmlFor="login-email" className="text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Email
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@school.edu"
-                required
-                disabled={isLoading}
-                className="w-full rounded-xl px-4 py-3 text-sm text-text-primary outline-none transition-all"
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  caretColor: "#4CAF82",
-                }}
-                onFocus={(e) => (e.target.style.border = "1px solid rgba(76,175,130,0.5)")}
-                onBlur={(e) => (e.target.style.border = "1px solid rgba(255,255,255,0.1)")}
-              />
+        {/* Right Side Login Card */}
+        <div className="lg:col-span-6 w-full max-w-md mx-auto">
+          <div className="bg-white/90 backdrop-blur-2xl border border-[#0F5A47]/20 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-[#0F5A47]/10 space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-extrabold text-[#0F172A] tracking-tight">Admin Sign In</h2>
+              <p className="text-xs text-[#475569] font-medium">Enter your credentials to manage school ledgers</p>
             </div>
 
-            {/* Password */}
-            <div className="space-y-1.5">
-              <label htmlFor="login-password" className="text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Password
-              </label>
-              <div className="relative">
+            {/* Quick Demo Fill Button */}
+            <button
+              type="button"
+              onClick={handleFillDemo}
+              className="w-full py-2.5 px-4 rounded-2xl bg-[#0F5A47]/10 hover:bg-[#0F5A47]/20 border border-[#0F5A47]/25 text-[#0F5A47] text-xs font-extrabold transition-all flex items-center justify-center gap-2 shadow-xs"
+            >
+              <Sparkles className="w-4 h-4 text-[#0F5A47]" />
+              Auto-Fill Demo Admin Credentials
+            </button>
+
+            <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="login-email" className="block text-xs font-extrabold text-[#475569] uppercase tracking-wider">
+                  Email Address *
+                </label>
                 <input
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  id="login-email"
+                  type="email"
                   required
                   disabled={isLoading}
-                  className="w-full rounded-xl px-4 py-3 pr-12 text-sm text-text-primary outline-none transition-all"
-                  style={{
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    caretColor: "#4CAF82",
-                  }}
-                  onFocus={(e) => (e.target.style.border = "1px solid rgba(76,175,130,0.5)")}
-                  onBlur={(e) => (e.target.style.border = "1px solid rgba(255,255,255,0.1)")}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@school.edu"
+                  className="w-full bg-white border border-[#0F5A47]/20 rounded-xl px-4 py-3 text-xs text-[#0F172A] font-medium focus:outline-none focus:border-[#0F5A47] transition-all"
                 />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" strokeLinecap="round" strokeLinejoin="round"/>
-                      <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
-                      <circle cx="12" cy="12" r="3"/>
-                    </svg>
-                  )}
-                </button>
               </div>
-            </div>
 
-            {/* Error */}
-            {error && (
-              <div
-                className="flex items-start gap-2 text-sm p-3 rounded-xl"
-                role="alert"
-                style={{ background: "rgba(200,100,100,0.08)", border: "1px solid rgba(200,100,100,0.2)", color: "#E06060" }}
-              >
-                <span aria-hidden="true">✕</span>
-                <span>{error}</span>
+              <div className="space-y-1.5">
+                <label htmlFor="login-password" className="block text-xs font-extrabold text-[#475569] uppercase tracking-wider">
+                  Password *
+                </label>
+                <div className="relative">
+                  <input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    disabled={isLoading}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-white border border-[#0F5A47]/20 rounded-xl px-4 py-3 pr-10 text-xs text-[#0F172A] font-medium focus:outline-none focus:border-[#0F5A47] transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#475569] hover:text-[#0F172A]"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-            )}
 
-            {/* Submit */}
-            <button
-              id="login-submit-btn"
-              type="submit"
-              disabled={isLoading || !email || !password}
-              className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]"
-              style={{
-                background: "linear-gradient(135deg, #4CAF82, #2D6A4F)",
-                color: "#fff",
-                boxShadow: "0 4px 16px rgba(76,175,130,0.3)",
-              }}
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin" width="16" height="16" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
-                  Signing in…
-                </span>
-              ) : (
-                "Sign In"
+              {error && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-bold text-red-600">
+                  {error}
+                </div>
               )}
-            </button>
-          </form>
 
-          {/* Demo hint */}
-          <div
-            className="text-center text-xs p-3 rounded-xl"
-            style={{ background: "rgba(76,175,130,0.06)", border: "1px solid rgba(76,175,130,0.12)" }}
-          >
-            <p className="text-text-secondary">
-              Demo credentials:{" "}
-              <span className="font-mono text-text-primary">admin@school.edu</span>
-              {" / "}
-              <span className="font-mono text-text-primary">demo1234</span>
-            </p>
+              <button
+                type="submit"
+                disabled={isLoading || !email || !password}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-extrabold hover:opacity-95 transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoading ? "Authenticating..." : "Sign In to Admin Dashboard"}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+
+            <div className="pt-2 text-center text-[11px] text-[#475569] font-medium border-t border-[#0F5A47]/15">
+              Role: <span className="font-bold text-[#0F172A]">Finance Administrator</span> • Multi-School Scope
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Footer note */}
-        <p className="text-center text-xs text-text-secondary mt-6 opacity-60">
-          Finora · Session 4 Demo Preview
-        </p>
+      {/* Bottom Footer */}
+      <div className="w-full max-w-6xl mx-auto text-center text-xs text-[#475569] font-semibold z-10">
+        © 2026 Finora Technologies. All rights reserved.
       </div>
     </div>
   );

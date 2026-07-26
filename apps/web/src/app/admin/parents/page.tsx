@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { createParentAccount, addStudentToParent } from "@/app/actions/parents";
 import { getStudents } from "@/app/actions/students";
+import { DEMO_SCHOOL_ID } from "@/lib/school-context";
 
 export default function AddParentPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [schoolId] = useState("123e4567-e89b-12d3-a456-426614174000"); // Mock or fetch from context
+  const [schoolId] = useState(DEMO_SCHOOL_ID);
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   

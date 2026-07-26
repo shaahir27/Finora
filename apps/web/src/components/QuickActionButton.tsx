@@ -11,7 +11,7 @@ export function QuickActionButton({ label, className = "", ...props }: QuickActi
   return (
     <button
       {...props}
-      className={`px-4 py-2 text-sm font-medium rounded-md border border-border-glass bg-surface-glass text-text-primary hover:bg-white/10 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-bg-base disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`px-3.5 py-2 text-xs font-bold rounded-xl border border-[#0F5A47]/20 bg-white text-[#0F5A47] hover:bg-[#0F5A47] hover:text-white shadow-xs active:scale-95 transition-all focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
       {label}
     </button>

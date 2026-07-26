@@ -44,3 +44,9 @@ export type {
 
 // Copilot helper tool (also used standalone by the server action)
 export { answerHowDoI } from "./answerHowDoI";
+
+// AI Feature 8 — Gemini AI Live Translation Fallback
+export {
+  translateTextWithGemini,
+  translateBatchWithGemini,
+} from "./translateText";

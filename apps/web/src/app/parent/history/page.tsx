@@ -1,148 +1,216 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { getMyPaymentHistory, getMyChildrenDues } from "@/app/actions/parents";
+import { generateReceipt } from "@/app/actions/receipts";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
+import { useDataState } from "@/lib/useDataState";
+import { FiveStateRenderer } from "@/components/FiveStateRenderer";
+import toast from "react-hot-toast";
+import { Download, Users, FileText, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 
 export default function ParentHistoryPage() {
   const t = useTranslations("History");
-  const { data: session, status } = useSession();
-  const [loading, setLoading] = useState(true);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  
-  const [students, setStudents] = useState<{id: string, name: string}[]>([]);
-  const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
+  const { data: session } = useSession();
+  const [selectedStudentName, setSelectedStudentName] = useState<string>("ALL");
+  const [receiptFormat, setReceiptFormat] = useState<"a4" | "thermal">("a4");
 
-  useEffect(() => {
-    if (status === "loading") return;
-    const parentUserId = session?.user?.id;
-    if (!parentUserId) {
-      setLoading(false);
-      return;
-    }
+  const parentUserId = session?.user?.id || "demo-parent-id";
 
-    Promise.all([
-      getMyChildrenDues(parentUserId),
-      getMyPaymentHistory(parentUserId)
-    ])
-    .then(([duesData, historyData]) => {
-      const map = new Map<string, string>();
-      duesData.forEach(d => map.set(d.studentId, d.studentName));
-      const studs = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-      setStudents(studs);
-      
-      setTransactions(historyData.transactions);
-      
-      if (studs.length > 0) {
-        const first = studs[0];
-        if (first) setSelectedStudentName(first.name);
-      } else if (historyData.transactions.length > 0) {
-        const firstTx = historyData.transactions[0];
-        if (firstTx) setSelectedStudentName(firstTx.studentName);
-      }
-    })
-    .catch(console.error)
-    .finally(() => setLoading(false));
-  }, [status, session]);
+  const dataState = useDataState({
+    queryKey: ["parentHistory", parentUserId],
+    queryFn: async () => {
+      const historyData = await getMyPaymentHistory(parentUserId);
+      return {
+        students: historyData.students || [],
+        transactions: historyData.transactions || [],
+      };
+    },
+    enabled: true,
+  });
 
-  const displayedTransactions = useMemo(() => {
-    if (!selectedStudentName) return [];
-    return transactions.filter(t => t.studentName === selectedStudentName);
-  }, [transactions, selectedStudentName]);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "posted": return "bg-status-posted text-white";
-      case "flagged": return "bg-status-flagged text-white";
-      case "reversed": return "bg-status-reversed text-white";
-      case "cheque_pending": return "bg-status-cheque-pending text-white";
-      default: return "bg-white/10 text-text-primary";
+  const handleDownload = async (txId: string) => {
+    try {
+      const res = await generateReceipt(txId, receiptFormat);
+      window.open(res.pdfUrl, "_blank");
+      toast.success(`Generated ${receiptFormat.toUpperCase()} Receipt PDF`);
+    } catch (e: any) {
+      toast.error(`Error generating receipt: ${e.message}`);
     }
   };
 
-  if (status === "loading" || loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(76,175,130,0.4)", borderTopColor: "transparent" }} />
-      </div>
-    );
-  }
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "posted":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-[#059669]/10 text-[#059669] border border-[#059669]/20 inline-flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Posted
+          </span>
+        );
+      case "flagged":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-red-500/10 text-red-600 border border-red-500/20 inline-flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" /> Flagged
+          </span>
+        );
+      case "reversed":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-slate-500/10 text-slate-600 border border-slate-500/20">
+            Reversed
+          </span>
+        );
+      case "cheque_pending":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 inline-flex items-center gap-1">
+            <Clock className="w-3 h-3" /> Cheque Pending
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-slate-500/10 text-slate-600">
+            {status}
+          </span>
+        );
+    }
+  };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary tracking-tight">{t("title")}</h1>
-        <p className="text-text-secondary mt-1">{t("subtitle")}</p>
+    <div className="max-w-6xl mx-auto space-y-6 font-sans">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-text-primary tracking-tight">
+            {t("title")}
+          </h1>
+          <p className="text-text-secondary text-sm mt-0.5 font-medium">
+            Verified transaction ledger and official digital receipt downloads.
+          </p>
+        </div>
+
+        {/* Receipt Format Preference */}
+        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-[#0F5A47]/20 text-xs shadow-sm">
+          <span className="font-bold text-text-secondary">Receipt Format:</span>
+          <select
+            value={receiptFormat}
+            onChange={(e) => setReceiptFormat(e.target.value as any)}
+            className="bg-transparent font-bold text-[#0F5A47] focus:outline-none"
+          >
+            <option value="a4">Standard A4 PDF</option>
+            <option value="thermal">Thermal POS Receipt</option>
+          </select>
+        </div>
       </div>
 
-      {students.length > 1 && (
-        <div className="flex space-x-2 border-b border-border-glass pb-2">
-          {students.map(s => (
-            <button
-              key={s.id}
-              onClick={() => setSelectedStudentName(s.name)}
-              className={`px-4 py-2 rounded-t-md transition-colors ${selectedStudentName === s.name ? 'bg-white/10 text-text-primary border-b-2 border-accent-primary' : 'text-text-secondary hover:bg-white/5'}`}
-            >
-              {s.name}
-            </button>
-          ))}
-        </div>
-      )}
+      <FiveStateRenderer state={dataState}>
+        {({ students, transactions }) => {
+          const displayedTransactions =
+            selectedStudentName === "ALL"
+              ? transactions
+              : transactions.filter((t: any) => t.studentName === selectedStudentName);
 
-      <GlassCard className="overflow-hidden">
-        {displayedTransactions.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-text-secondary">No payment history found.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs uppercase text-text-secondary bg-white/5 border-b border-border-glass">
-                <tr>
-                  <th className="px-6 py-4 font-medium">{t("date")}</th>
-                  <th className="px-6 py-4 font-medium">Fee Type</th>
-                  <th className="px-6 py-4 font-medium">{t("channel")}</th>
-                  <th className="px-6 py-4 font-medium text-right">Amount</th>
-                  <th className="px-6 py-4 font-medium text-center">{t("status")}</th>
-                  <th className="px-6 py-4 font-medium text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-glass">
-                {displayedTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 text-text-primary whitespace-nowrap">
-                      {new Date(tx.postedAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-text-primary">
-                      {tx.feeType}
-                    </td>
-                    <td className="px-6 py-4 text-text-secondary uppercase text-xs tracking-wider">
-                      {tx.channel}
-                    </td>
-                    <td className="px-6 py-4 text-text-primary text-right font-medium">
-                      ₹{tx.amount}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`px-2 py-1 rounded-full text-[10px] uppercase tracking-wider font-medium ${getStatusColor(tx.status)}`}>
-                        {tx.status.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {tx.status === "posted" && (
-                        <button className="text-xs text-accent-primary-text hover:text-white transition-colors border border-accent-primary-text/30 px-3 py-1 rounded-md hover:bg-accent-primary-text/10">
-                          {t("download_receipt")}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </GlassCard>
+          return (
+            <div className="space-y-6">
+              {/* Child Switcher Toggle Bar */}
+              {students.length > 0 && (
+                <div className="p-1.5 bg-[#EBE7DF] rounded-2xl flex overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap gap-1.5 border border-[#0F5A47]/15">
+                  <button
+                    onClick={() => setSelectedStudentName("ALL")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      selectedStudentName === "ALL"
+                        ? "bg-[#0F5A47] text-white shadow-md shadow-[#0F5A47]/20"
+                        : "text-text-secondary hover:text-text-primary hover:bg-white/50"
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    All Children ({transactions.length} Payments)
+                  </button>
+                  {students.map((s: any) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSelectedStudentName(s.name)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        selectedStudentName === s.name
+                          ? "bg-[#0F5A47] text-white shadow-md shadow-[#0F5A47]/20"
+                          : "text-text-secondary hover:text-text-primary hover:bg-white/50"
+                      }`}
+                    >
+                      <span>👦</span>
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Transactions Table Card */}
+              <GlassCard className="p-0 overflow-hidden border-[#0F5A47]/15">
+                {displayedTransactions.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <FileText className="w-8 h-8 text-text-secondary mx-auto mb-2 opacity-60" />
+                    <p className="text-sm font-bold text-text-primary">No payment history found.</p>
+                    <p className="text-xs text-text-secondary mt-1">Payments recorded via UPI, Cash, or Cheque will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="text-[11px] uppercase font-bold text-text-secondary bg-[#EBE7DF]/60 border-b border-border-glass">
+                        <tr>
+                          <th className="px-6 py-3.5">Date</th>
+                          <th className="px-6 py-3.5">Student</th>
+                          <th className="px-6 py-3.5">Fee Item</th>
+                          <th className="px-6 py-3.5">Channel</th>
+                          <th className="px-6 py-3.5 text-right">Amount</th>
+                          <th className="px-6 py-3.5 text-center">Status</th>
+                          <th className="px-6 py-3.5 text-right">Official Receipt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-glass bg-white/60">
+                        {displayedTransactions.map((tx: any) => (
+                          <tr key={tx.id} className="hover:bg-[#0F5A47]/5 transition-colors">
+                            <td className="px-6 py-4 font-semibold text-text-primary whitespace-nowrap">
+                              {new Date(tx.postedAt).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </td>
+                            <td className="px-6 py-4 font-bold text-text-primary">
+                              {tx.studentName}
+                            </td>
+                            <td className="px-6 py-4 font-medium text-text-primary">
+                              {tx.feeType}
+                            </td>
+                            <td className="px-6 py-4 uppercase font-bold text-[#0F5A47] tracking-wider text-[10px]">
+                              {tx.channel}
+                            </td>
+                            <td className="px-6 py-4 text-right font-extrabold text-base text-[#0F172A]">
+                              ₹{Number(tx.amount).toLocaleString("en-IN")}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {getStatusBadge(tx.status)}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {tx.status === "posted" && (
+                                <button
+                                  onClick={() => handleDownload(tx.id)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F5A47] font-bold text-xs hover:bg-[#0F5A47]/10 transition-all shadow-sm"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  Receipt PDF
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </GlassCard>
+            </div>
+          );
+        }}
+      </FiveStateRenderer>
     </div>
   );
 }

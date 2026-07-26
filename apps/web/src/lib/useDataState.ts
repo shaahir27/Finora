@@ -37,7 +37,7 @@ export function useDataState<T>(options: ExtendedQueryOptions<T>): DataState<T> 
     return { state: "conflict", data: data as T };
   }
 
-  if (options.isRealtimeLive === false || query.isStale) {
+  if (options.isRealtimeLive === false) {
     return { state: "stale", data: data as T };
   }
 

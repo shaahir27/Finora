@@ -19,7 +19,8 @@ import type { OcrExtractionResult } from "@smart-school/ai";
 
 // In production, image upload would go to Supabase Storage and return a URL.
 // For Session 4, we accept an image URL directly (demo-compatible).
-const SCHOOL_ID = process.env.NEXT_PUBLIC_DEMO_SCHOOL_ID ?? "demo-school";
+import { DEMO_SCHOOL_ID } from "@/lib/school-context";
+const SCHOOL_ID = DEMO_SCHOOL_ID;
 const ADMIN_ID = "demo-admin"; // Session 6: derive from auth session
 
 type OcrStage =

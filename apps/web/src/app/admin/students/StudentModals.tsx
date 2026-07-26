@@ -39,28 +39,28 @@ export function AddStudentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#1A1C23] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-        <h2 className="text-xl font-bold text-white mb-4">Add New Student</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-[#F4F1EA] border border-border-glass rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+        <h2 className="text-xl font-bold text-text-primary">Add New Student</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Full Name</label>
-            <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4CAF82]" placeholder="e.g. John Doe" />
+            <label className="block text-xs font-semibold text-text-secondary mb-1">Full Name *</label>
+            <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2 bg-white border border-border-glass rounded-xl text-text-primary focus:outline-none focus:border-[#0F5A47] text-sm" placeholder="e.g. Rahul Sharma" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Class</label>
-            <input required type="text" value={className} onChange={e => setClassName(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4CAF82]" placeholder="e.g. 10A" />
+            <label className="block text-xs font-semibold text-text-secondary mb-1">Class *</label>
+            <input required type="text" value={className} onChange={e => setClassName(e.target.value)} className="w-full px-4 py-2 bg-white border border-border-glass rounded-xl text-text-primary focus:outline-none focus:border-[#0F5A47] text-sm" placeholder="e.g. Class 10A" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Admission Number</label>
-            <input type="text" value={admissionNumber} onChange={e => setAdmissionNumber(e.target.value)} className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4CAF82]" placeholder="e.g. ADM-001" />
+            <label className="block text-xs font-semibold text-text-secondary mb-1">Admission Number</label>
+            <input type="text" value={admissionNumber} onChange={e => setAdmissionNumber(e.target.value)} className="w-full px-4 py-2 bg-white border border-border-glass rounded-xl text-text-primary focus:outline-none focus:border-[#0F5A47] text-sm" placeholder="e.g. ADM-1042" />
           </div>
           
           <div className="flex justify-end gap-3 mt-6">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg font-medium text-gray-400 hover:text-white transition-colors">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-semibold text-text-secondary hover:bg-black/5 transition-colors">
               Cancel
             </button>
-            <button disabled={isPending} type="submit" className="px-4 py-2 rounded-lg font-medium bg-[#4CAF82] text-white hover:opacity-90 disabled:opacity-50 transition-colors">
+            <button disabled={isPending} type="submit" className="px-5 py-2 rounded-xl text-xs font-bold bg-[#0F5A47] text-white hover:opacity-90 disabled:opacity-50 transition-colors shadow-md">
               {isPending ? "Adding..." : "Add Student"}
             </button>
           </div>
@@ -96,15 +96,14 @@ export function ImportCsvModal({
         skipEmptyLines: true,
         complete: async (results) => {
           try {
-            // Map CSV rows to student data
             const studentsData = results.data.map((row: any) => ({
               name: row.name || row.Name || row.NAME,
               class: row.class || row.Class || row.CLASS,
               admissionNumber: row.admissionNumber || row.AdmissionNumber || row.admission_number || null,
-            })).filter((s) => s.name && s.class); // basic validation
+            })).filter((s) => s.name && s.class);
 
             const { succeeded, failed, skipped } = await bulkImportStudents(schoolId, studentsData);
-            alert(`Import complete!\nSucceeded: ${succeeded.length}\nSkipped (exists): ${skipped.length}\nFailed: ${failed.length}`);
+            alert(`Import complete!\nSucceeded: ${succeeded.length}\nSkipped: ${skipped.length}\nFailed: ${failed.length}`);
             onSuccess();
             onClose();
             setFile(null);
@@ -120,15 +119,15 @@ export function ImportCsvModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#1A1C23] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-        <h2 className="text-xl font-bold text-white mb-2">Import Students CSV</h2>
-        <p className="text-sm text-gray-400 mb-6">CSV must have headers: name, class, admissionNumber</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-[#F4F1EA] border border-border-glass rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+        <h2 className="text-xl font-bold text-text-primary mb-1">Import Students CSV</h2>
+        <p className="text-xs text-text-secondary mb-4">Required CSV columns: name, class, admissionNumber</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block w-full cursor-pointer text-center px-4 py-8 bg-white/5 border-2 border-dashed border-white/20 rounded-xl hover:border-[#4CAF82] hover:bg-[#4CAF82]/5 transition-all">
-              <span className="text-sm text-gray-300">
-                {file ? file.name : "Click to select CSV file"}
+            <label className="block w-full cursor-pointer text-center px-4 py-8 bg-white border-2 border-dashed border-border-glass rounded-2xl hover:border-[#0F5A47] hover:bg-[#0F5A47]/5 transition-all">
+              <span className="text-xs font-medium text-text-secondary">
+                {file ? file.name : "Click or drag CSV file here"}
               </span>
               <input 
                 type="file" 
@@ -140,10 +139,10 @@ export function ImportCsvModal({
           </div>
           
           <div className="flex justify-end gap-3 mt-6">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg font-medium text-gray-400 hover:text-white transition-colors">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-semibold text-text-secondary hover:bg-black/5 transition-colors">
               Cancel
             </button>
-            <button disabled={isPending || !file} type="submit" className="px-4 py-2 rounded-lg font-medium bg-[#4CAF82] text-white hover:opacity-90 disabled:opacity-50 transition-colors">
+            <button disabled={isPending || !file} type="submit" className="px-5 py-2 rounded-xl text-xs font-bold bg-[#0F5A47] text-white hover:opacity-90 disabled:opacity-50 transition-colors shadow-md">
               {isPending ? "Importing..." : "Import CSV"}
             </button>
           </div>
@@ -152,3 +151,4 @@ export function ImportCsvModal({
     </div>
   );
 }
+

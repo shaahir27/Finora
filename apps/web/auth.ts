@@ -1,6 +1,7 @@
 import NextAuth, { NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { supabase } from "@/lib/supabase-client";
+import { DEMO_SCHOOL_ID } from "@/lib/school-context";
 
 const authConfig: NextAuthConfig = {
   providers: [
@@ -20,9 +21,10 @@ const authConfig: NextAuthConfig = {
           credentials.password === "demo1234"
         ) {
           return {
-            id: "admin-demo-id",
+            id: "seed-admin-01",
             email: credentials.email as string,
             role: "admin",
+            schoolId: DEMO_SCHOOL_ID,
           } as any;
         }
         return null;
@@ -49,6 +51,8 @@ const authConfig: NextAuthConfig = {
             id: "demo-parent-id",
             email: "parent@demo.com",
             role: "parent",
+            schoolId: DEMO_SCHOOL_ID,
+            parentLinkId: "parent-link-demo-id",
           } as any;
         }
 
@@ -67,6 +71,8 @@ const authConfig: NextAuthConfig = {
           id: data.user.id,
           email: data.user.email ?? null,
           role: "parent",
+          schoolId: DEMO_SCHOOL_ID,
+          parentLinkId: data.user.id,
         } as any;
       },
     }),
@@ -76,6 +82,8 @@ const authConfig: NextAuthConfig = {
       if (user) {
         token.role = user.role;
         token.id = user.id;
+        token.schoolId = user.schoolId;
+        token.parentLinkId = user.parentLinkId;
       }
       return token;
     },
@@ -83,6 +91,8 @@ const authConfig: NextAuthConfig = {
       if (token && session.user) {
         session.user.role = token.role as string;
         session.user.id = token.id as string;
+        (session.user as any).schoolId = token.schoolId as string;
+        (session.user as any).parentLinkId = token.parentLinkId as string;
       }
       return session;
     },

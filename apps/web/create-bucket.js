@@ -11,37 +11,34 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function main() {
-  console.log("Checking if 'receipts' bucket exists...");
   const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-  
+
   if (listError) {
     console.error("Error listing buckets:", listError);
     process.exit(1);
   }
 
-  const receiptsBucket = buckets.find(b => b.name === "receipts");
-  
-  if (!receiptsBucket) {
-    console.log("Creating 'receipts' bucket...");
-    const { data, error } = await supabase.storage.createBucket("receipts", {
-      public: true, // Need public access to view PDFs directly
-      fileSizeLimit: 10485760, // 10MB
-    });
+  for (const bucketName of ["receipts", "reports"]) {
+    console.log(`Checking if '${bucketName}' bucket exists...`);
+    const existing = buckets.find((b) => b.name === bucketName);
 
-    if (error) {
-      console.error("Failed to create bucket:", error);
-      process.exit(1);
-    }
-    console.log("Bucket 'receipts' created successfully.");
-  } else {
-    console.log("Bucket 'receipts' already exists.");
-    
-    // Ensure it's public
-    if (!receiptsBucket.public) {
-      console.log("Updating bucket to be public...");
-      await supabase.storage.updateBucket("receipts", {
+    if (!existing) {
+      console.log(`Creating '${bucketName}' bucket...`);
+      const { error } = await supabase.storage.createBucket(bucketName, {
         public: true,
+        fileSizeLimit: 10485760,
       });
+
+      if (error) {
+        console.error(`Failed to create bucket '${bucketName}':`, error);
+        process.exit(1);
+      }
+      console.log(`Bucket '${bucketName}' created successfully.`);
+    } else if (!existing.public) {
+      console.log(`Updating '${bucketName}' bucket to be public...`);
+      await supabase.storage.updateBucket(bucketName, { public: true });
+    } else {
+      console.log(`Bucket '${bucketName}' already exists.`);
     }
   }
 }

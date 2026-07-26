@@ -15,9 +15,10 @@ import { useState, useTransition, useCallback, useEffect } from "react";
 import { getRemindersQueue, markReminderSent } from "@/app/actions/reminders";
 import type { ReminderQueueItem } from "@/app/actions/reminders";
 import { GlassCard } from "@/components/GlassCard";
+import { DEMO_SCHOOL_ID } from "@/lib/school-context";
 
 // Hardcoded for demo — Session 6: derive from auth session
-const SCHOOL_ID = process.env.NEXT_PUBLIC_DEMO_SCHOOL_ID ?? "demo-school";
+const SCHOOL_ID = DEMO_SCHOOL_ID;
 
 const TIER_LABELS: Record<number, { label: string; color: string }> = {
   1:  { label: "Day 1",  color: "#FFC864" },
@@ -60,6 +61,7 @@ export default function RemindersQueuePage() {
   };
 
   const handleMarkSent = (id: string) => {
+    if (!confirm("Are you sure you want to mark this reminder as sent?")) return;
     startTransition(async () => {
       try {
         const { status, dispatchError } = await markReminderSent(id);

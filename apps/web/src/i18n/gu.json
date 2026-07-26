@@ -1,0 +1,60 @@
+{
+  "Navigation": {
+    "dues": "ડૅશબોર્ડ & બાકી ફી",
+    "history": "ચુકવણી ઇતિહાસ",
+    "copilot": "એઆઈ કૉકપિટ",
+    "settings": "સેટિંગ્સ",
+    "logout": "સાઇન આઉટ"
+  },
+  "Dues": {
+    "title": "મારી બાકી ફી",
+    "subtitle": "તમારી શાળાની ફી ચુકવણીની વિગતો",
+    "cockpit_title": "વાલી કૉકપિટ & બાકી ફી",
+    "cockpit_subtitle": "ફી ખાતા, કર પ્રમાણપત્ર અને UPI ચુકવણી વ્યવસ્થાપિત કરો.",
+    "sec80c_btn": "કલમ 80સી કર પ્રમાણપત્ર",
+    "gst_btn": "જીએસટી & એસએસી 9992",
+    "all_children": "તમામ બાળકો",
+    "total_dues_remaining": "કુલ બાકી ફી",
+    "overdue_warning": "મુદત પૂર્ણ ચેતવણી",
+    "on_track": "સમયસર",
+    "pay_combined": "એક સાથે ચૂકવો",
+    "installment_sim": "હપ્તા સિમ્યુલેટર",
+    "unpaid": "અનપેઇડ (બાકી)",
+    "paid": "ચૂકવેલ",
+    "partially_paid": "અંશતઃ ચૂકવેલ",
+    "overdue": "મુદત પૂરી થયેલ",
+    "pay_now": "હમણાં જ ચૂકવો",
+    "amount": "કુલ રકમ",
+    "remaining": "બાકી રકમ",
+    "due_date": "છેલ્લી તારીખ"
+  },
+  "Payment": {
+    "title": "ફી ચૂકવો",
+    "subtitle": "સુરક્ષિત UPI અને કાર્ડ ચુકવણી",
+    "amount_to_pay": "ચૂકવવાની રકમ",
+    "proceed": "ચુકવણી માટે આગળ વધો",
+    "success": "ચુકવણી સફળ રહી!",
+    "failed": "ચુકવણી નિષ્ફળ. ફરી પ્રયાસ કરો."
+  },
+  "History": {
+    "title": "ચુકવણી ઇતિહાસ",
+    "subtitle": "અગાઉના વ્યવહારો અને પહોંચ",
+    "download_receipt": "પહોંચ ડાઉનલોડ કરો",
+    "channel": "ચુકવણી માધ્યમ",
+    "status": "સ્થિતિ",
+    "date": "તારીખ"
+  },
+  "Settings": {
+    "title": "સેટિંગ્સ અને પસંદગીઓ",
+    "push_notifications": "પુશ નોટિફિકેશન",
+    "push_description": "ચુકવણી કન્ફર્મ થતાં તરત જ અલર્ટ મેળવો.",
+    "language": "ભાષા પસંદ કરો",
+    "english": "English",
+    "hindi": "हिंदी"
+  },
+  "Copilot": {
+    "title": "ફિનોરા એઆઈ સહાયક",
+    "subtitle": "તમારી ફી વિશે પ્રશ્નો પૂછો",
+    "placeholder": "અહીં પ્રશ્ન લખો..."
+  }
+}

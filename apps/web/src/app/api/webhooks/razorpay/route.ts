@@ -36,7 +36,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. Read raw body — MUST happen before any JSON.parse.
   //    Signature verification is over raw bytes, not the parsed object.
   const rawBody = await req.text();
-  const signature = req.headers.get("x-razorpay-signature") ?? "";
+  const signature = req.headers.get("x-razorpay-signature");
+
+  if (!signature) {
+    return NextResponse.json({ error: "Missing x-razorpay-signature header" }, { status: 400 });
+  }
 
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!webhookSecret) {

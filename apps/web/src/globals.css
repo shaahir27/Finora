@@ -4,64 +4,121 @@
 
 @layer base {
   :root {
-    --color-bg-base: #0A0C0F;
-    --color-bg-surface: #0F1115;
-    --color-surface-glass: rgba(255, 255, 255, 0.02);
-    --color-surface-glass-hero: rgba(63, 154, 163, 0.1);
-    --color-border-glass: rgba(255, 255, 255, 0.05);
-    --color-text-primary: #ffffff;
-    --color-text-secondary: rgba(255, 255, 255, 0.6);
-    --color-accent-primary: #14555C;
-    --color-accent-primary-text: #3F9AA3;
-    --color-accent-emerald: #6BBF82;
-    --color-accent-gold: #F2C94C;
-    --color-risk-high: #A6432D;
-    --color-risk-medium: #F2C94C;
-    --color-risk-low: #6BBF82;
-    --color-status-posted: #6BBF82;
-    --color-status-cheque-pending: #F2C94C;
-    --color-status-flagged: #A6432D;
-    --color-status-reversed: #8A7F6E;
+    /* Warm Alabaster Sand & Imperial Emerald Light Theme */
+    --color-bg-base: #F4F1EA;              /* Warm Alabaster Sand Canvas */
+    --color-bg-surface: #EBE7DF;           /* Soft Linen Base */
+    --color-surface-glass: rgba(255, 255, 255, 0.92); /* Translucent Porcelain Glass */
+    --color-surface-glass-hero: linear-gradient(135deg, rgba(240, 246, 243, 0.96) 0%, rgba(220, 238, 233, 0.9) 100%);
+    --color-border-glass: rgba(15, 90, 71, 0.12);    /* Subtle Emerald Inner Highlight */
+    --color-text-primary: #0F172A;         /* Deep Slate Charcoal */
+    --color-text-secondary: #475569;       /* Muted Steel Slate */
+    --color-accent-primary: #0F5A47;       /* Deep Imperial Emerald */
+    --color-accent-primary-text: #0D7A5F;  /* Vibrant Imperial Teal */
+    --color-accent-emerald: #059669;       /* Sage Emerald */
+    --color-accent-gold: #D97706;          /* Terracotta Amber */
+    --color-risk-high: #DC2626;            /* Crimson Red */
+    --color-risk-medium: #D97706;          /* Terracotta Amber */
+    --color-risk-low: #059669;             /* Sage Emerald */
+    --color-status-posted: #059669;
+    --color-status-cheque-pending: #D97706;
+    --color-status-flagged: #DC2626;
+    --color-status-reversed: #64748B;
   }
 }
 
 body {
   background-color: var(--color-bg-base);
   color: var(--color-text-primary);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 @layer components {
+  /* Warm Porcelain Glassmorphism Card */
   .glass-card {
     background-color: var(--color-surface-glass);
-    border: 1px solid var(--color-border-glass);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(15, 90, 71, 0.12);
+    box-shadow: 
+      0 10px 30px -5px rgba(15, 90, 71, 0.05),
+      0 4px 12px -2px rgba(0, 0, 0, 0.02),
+      inset 0 1px 1px rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .glass-card:hover {
+    box-shadow: 
+      0 14px 40px -4px rgba(15, 90, 71, 0.08),
+      0 6px 16px -2px rgba(0, 0, 0, 0.03),
+      inset 0 1px 1px rgba(255, 255, 255, 1);
   }
   
+  /* Imperial Emerald Hero Container */
   .glass-hero {
-    background-color: var(--color-surface-glass-hero);
-    border: 1px solid var(--color-border-glass);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    background: linear-gradient(135deg, rgba(240, 246, 243, 0.96) 0%, rgba(225, 238, 233, 0.9) 100%);
+    border: 1px solid rgba(15, 90, 71, 0.2);
+    box-shadow: 
+      0 16px 40px -8px rgba(15, 90, 71, 0.1),
+      inset 0 1px 2px rgba(255, 255, 255, 1);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+  }
+
+  /* Interactive Imperial Emerald Button Effect */
+  .neu-button {
+    background: linear-gradient(135deg, #0F5A47 0%, #0D7A5F 100%);
+    color: #FFFFFF;
+    box-shadow: 
+      0 4px 14px 0 rgba(15, 90, 71, 0.3),
+      inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    transition: all 0.2s ease;
+  }
+  
+  .neu-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 
+      0 6px 20px 0 rgba(15, 90, 71, 0.4),
+      inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  }
+
+  .neu-button:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 8px 0 rgba(15, 90, 71, 0.25);
   }
 
   .glass-list-row {
-    background-color: var(--color-surface-glass);
-    border: 1px solid var(--color-border-glass);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background-color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(15, 90, 71, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   @media (prefers-reduced-transparency: reduce) {
     .glass-card, .glass-list-row {
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
-      background-color: #26221D; /* Solid fallback */
+      background-color: #FFFFFF;
     }
     .glass-hero {
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
-      background-color: #14555C; /* Solid fallback */
+      background-color: #F0F6F3;
     }
   }
 }
+
+/* Indic Script Custom Typography Spacing (prevents cramped matras/letters) */
+.indic-locale-spacing {
+  letter-spacing: 0.018em;
+  line-height: 1.6;
+}
+.indic-locale-spacing h1,
+.indic-locale-spacing h2,
+.indic-locale-spacing h3,
+.indic-locale-spacing h4,
+.indic-locale-spacing span,
+.indic-locale-spacing button,
+.indic-locale-spacing p {
+  letter-spacing: 0.012em !important;
+}
+

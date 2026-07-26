@@ -18,6 +18,7 @@
 import { prisma, type PaymentChannel } from "@smart-school/db";
 import { recordPayment } from "./ledger";
 import { notifySchoolAdmins } from "./push";
+import { requireAdminForSchool } from "@/lib/require-session";
 
 // ---------------------------------------------------------------------------
 // syncOfflinePayment
@@ -54,6 +55,8 @@ export async function syncOfflinePayment(
       "syncOfflinePayment rejects upi channel. Only cash and cheque can be queued offline."
     );
   }
+
+  await requireAdminForSchool(schoolId);
 
   try {
     const result = await recordPayment(adminId, schoolId, {
@@ -95,6 +98,8 @@ export async function reportSyncConflict(
   queuedAt: string,
   conflictReason: string
 ): Promise<{ id: string }> {
+  await requireAdminForSchool(schoolId);
+
   // Upsert — if the same localId was already escalated (retried call), update rather than duplicate.
   const existing = await prisma.offlineSyncConflict.findUnique({
     where: { localId },
@@ -137,6 +142,8 @@ export async function reportSyncConflict(
  * Any admin at the school can view these — not scoped to the submitting admin.
  */
 export async function getSyncConflicts(schoolId: string) {
+  await requireAdminForSchool(schoolId);
+
   return prisma.offlineSyncConflict.findMany({
     where: { schoolId, resolved: false },
     orderBy: { createdAt: "asc" },
@@ -176,6 +183,9 @@ export async function resolveSyncConflict(
   });
   if (!conflict) throw new Error("Sync conflict not found.");
   if (conflict.resolved) throw new Error("Conflict is already resolved.");
+
+  const { adminId: sessionAdminId } = await requireAdminForSchool(conflict.schoolId);
+  const effectiveAdmin = sessionAdminId || adminId;
 
   await prisma.offlineSyncConflict.update({
     where: { id: conflictId },

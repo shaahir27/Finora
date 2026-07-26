@@ -54,25 +54,29 @@ status: "Built"
   )
   // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
-  * `getLedgerSnapshot` (`apps/web/src/app/actions/ledger.ts`): Aggregates total collected revenue and pending fees across the school.
+  * `getLedgerSnapshot` (`apps/web/src/app/actions/ledger.ts`): Aggregates total collected revenue (excluding `flagged` transactions) and pending fees across the school.
   ```typescript
   export async function getLedgerSnapshot(
-    schoolId: string, options?: { channel?: PaymentChannel; startDate?: Date; endDate?: Date; }
+    schoolId: string, options?: { channel?: PaymentChannel; startDate?: Date; endDate?: Date; cursor?: string; limit?: number; }
   )
-  // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
   ```
   * `markChequeCleared` (`apps/web/src/app/actions/ledger.ts`): Safely advances a cheque's reconciliation status to posted.
   ```typescript
   export async function markChequeCleared(transactionId: string): Promise<Transaction>
-  // Note: Code snippets represent the function signature at the time this feature was built. Always check the actual file for the most up-to-date signature.
+  ```
+  * `resolveAnomaly` (`apps/web/src/app/actions/ledger.ts`): Resolves a flagged anomaly transaction as either `posted` or `reversed` with mandatory audit logging and note tracking.
+  ```typescript
+  export async function resolveAnomaly(
+    adminId: string, transactionId: string, resolution: "posted" | "reversed", notes?: string
+  )
   ```
 
 ## 5. Testing & Verification
 * **Automated tests:**
   * `apps/web/src/__tests__/waiverPenaltyAudit.test.ts` — directly tests `applyWaiver` and `applyPenalty`: verifies `AUDIT_LOG` rows are produced on every call, empty/null reasons are rejected at the application layer, and empty `adminId` is rejected.
-  * `apps/web/src/__tests__/reconciliation.test.ts` — tests `recordPayment`, `markChequeBounced`, `markChequeCleared`, and `resolveSyncConflict`, all of which flow through ledger engine functions built in this session.
+  * `apps/web/src/__tests__/reconciliation.test.ts` — tests `recordPayment`, `markChequeBounced`, `markChequeCleared`, and `resolveSyncConflict`.
 * **Manually verified:** DB-level lock testing for concurrency, security check that waivers and penalties enforce `adminId` and emit `AUDIT_LOG`.
 
 ## 6. Dependencies & Deferred Work
 * **Depends on:** `detectAnomaly` and `computeDefaulterScore` from `packages/rules`.
-* **Known issues/deferred:** AI narration of anomalies deferred to Session 4. Razorpay webhook API route (always required) was deferred to Session 2 and ultimately built in the 2026-07-24 audit pass. The `applyWaiver` cumulative-waived bug in the defaulter score recompute loop was identified and fixed in the 2026-07-24 audit pass — see Section 4 correction.
+* **Updates applied in Audit Pass**: `resolveAnomaly` action added, `totalCollected` updated to exclude `flagged` status, `applyWaiver` validated against balance, and `applyPenalty` updated to recompute defaulter score.

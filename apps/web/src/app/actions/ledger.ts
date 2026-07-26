@@ -18,6 +18,7 @@ import {
   type DuplicateRefInput,
 } from "@smart-school/rules";
 import { notifySchoolAdmins, sendPushNotification } from "./push";
+import { requireAdminForSchool } from "@/lib/require-session";
 
 /**
  * The core payment recording function.
@@ -33,6 +34,9 @@ export async function recordPayment(
     refNumber?: string;
   }
 ) {
+  const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
+  const effectiveAdminId = sessionAdminId || adminId;
+
   if (data.amount <= 0) {
     throw new Error("Payment amount must be greater than zero.");
   }
@@ -82,6 +86,7 @@ export async function recordPayment(
     if (data.channel === "upi" && data.refNumber) {
       const existingUpi = await tx.transaction.findFirst({
         where: {
+          schoolId,
           channel: "upi",
           refNumber: data.refNumber,
         },
@@ -209,7 +214,10 @@ export async function recordPayment(
     }).catch(console.error);
   }
 
-  return result;
+  return {
+    ...result,
+    transaction: serializeTransaction(result.transaction),
+  };
 }
 
 /**
@@ -219,8 +227,8 @@ export async function reverseTransaction(
   adminId: string,
   transactionId: string,
   reason: string
-): Promise<Transaction> {
-  return prisma.$transaction(async (tx) => {
+) {
+  const result = await prisma.$transaction(async (tx) => {
     const transaction = await tx.transaction.findUnique({
       where: { id: transactionId },
     });
@@ -244,18 +252,13 @@ export async function reverseTransaction(
       data: { reconciliationStatus: "reversed" },
     });
   });
+  return serializeTransaction(result);
 }
 
-/**
- * Flips a cheque_pending transaction to posted (cheque cleared).
- * Does not produce an AUDIT_LOG — clearing is the normal/expected outcome,
- * not an exception event. Only reversals, bounces, waivers, penalties are logged.
- * financial_engine.md §3: cheque_pending → (markChequeCleared) → posted
- */
 export async function markChequeCleared(
   transactionId: string
-): Promise<Transaction> {
-  return prisma.$transaction(async (tx) => {
+) {
+  const result = await prisma.$transaction(async (tx) => {
     const transaction = await tx.transaction.findUnique({
       where: { id: transactionId },
     });
@@ -271,6 +274,7 @@ export async function markChequeCleared(
       data: { reconciliationStatus: "posted" },
     });
   });
+  return serializeTransaction(result);
 }
 
 /**
@@ -347,6 +351,7 @@ export async function markChequeBounced(
       include: {
         transactions: { select: { amount: true, reconciliationStatus: true } },
         waivers: { select: { amount: true } },
+        reminderLogs: { where: { status: { in: ["sent", "simulated_sent"] } } },
       },
     });
 
@@ -354,6 +359,7 @@ export async function markChequeBounced(
     let totalPaid = 0;
     let totalWaived = 0;
     let maxDaysOverdue = 0;
+    let brokenPromiseCount = 0;
 
     for (const a of studentAssignments) {
       totalAmount += a.amount.toNumber();
@@ -367,26 +373,20 @@ export async function markChequeBounced(
           0,
           Math.floor((Date.now() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
         );
+        if (days > 0 && a.reminderLogs) {
+          brokenPromiseCount += a.reminderLogs.length;
+        }
         if (days > maxDaysOverdue) maxDaysOverdue = days;
       }
     }
 
     const newScore = computeDefaulterScore(
       maxDaysOverdue,
-      0, // broken_promise_count — requires REMINDER_LOG join, deferred to full recompute job
+      brokenPromiseCount,
       totalAmount,
       totalPaid,
       totalWaived
     );
-
-    await tx.defaulterScore.create({
-      data: {
-        studentId,
-        schoolId,
-        riskLevel: newScore.riskLevel === "high" ? 3 : newScore.riskLevel === "medium" ? 2 : 1,
-        computedReason: newScore.reason,
-      },
-    });
 
     return reversed;
   });
@@ -397,7 +397,7 @@ export async function markChequeBounced(
     url: `/admin/students/${result.studentId}`,
   }).catch(console.error);
 
-  return result;
+  return serializeTransaction(result);
 }
 
 /**
@@ -412,7 +412,7 @@ export async function applyWaiver(
     amount: number;
     reason: string;
   }
-): Promise<Waiver> {
+) {
   if (!data.reason || data.reason.trim() === "") {
     throw new Error("A reason is required to apply a waiver.");
   }
@@ -420,7 +420,7 @@ export async function applyWaiver(
     throw new Error("An approver is required to apply a waiver.");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const assignment = await tx.feeAssignment.findUnique({
       where: { id: feeAssignmentId },
       include: {
@@ -437,6 +437,10 @@ export async function applyWaiver(
       amountPaidBefore,
       waivedBefore
     );
+
+    if (data.amount > balanceBefore) {
+      throw new Error(`Waiver amount (₹${data.amount}) cannot exceed the remaining balance (₹${balanceBefore}).`);
+    }
 
     const waiver = await tx.waiver.create({
       data: {
@@ -458,12 +462,12 @@ export async function applyWaiver(
     });
 
     // Immediately recompute defaulter score for this student
-    // Need to fetch ALL assignments for the student to recompute total score
     const studentAssignments = await tx.feeAssignment.findMany({
       where: { studentId: assignment.studentId },
       include: {
         transactions: { select: { amount: true, reconciliationStatus: true } },
         waivers: { select: { amount: true } },
+        reminderLogs: { where: { status: { in: ["sent", "simulated_sent"] } } },
       },
     });
 
@@ -471,14 +475,12 @@ export async function applyWaiver(
     let totalPaid = 0;
     let totalWaived = 0;
     let maxDaysOverdue = 0;
+    let brokenPromiseCount = 0;
 
     for (const a of studentAssignments) {
       totalAmount += a.amount.toNumber();
       const pd = calculateAmountPaid(a.transactions);
       totalPaid += pd;
-      // Use per-assignment wv for balance check, then accumulate into totalWaived.
-      // Bug fix: previously totalWaived (cumulative) was passed to calculateRemainingBalance,
-      // which underestimated balance on 2nd+ assignment and produced a wrong defaulter score.
       const wv = calculateWaivedAmount(a.waivers);
       totalWaived += wv;
 
@@ -488,13 +490,16 @@ export async function applyWaiver(
           0,
           Math.floor((new Date().getTime() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
         );
+        if (days > 0 && a.reminderLogs) {
+          brokenPromiseCount += a.reminderLogs.length;
+        }
         if (days > maxDaysOverdue) maxDaysOverdue = days;
       }
     }
 
     const newScore = computeDefaulterScore(
       maxDaysOverdue,
-      0, // broken promises not simulated in this snippet, would need to count from REMINDER_LOG
+      brokenPromiseCount,
       totalAmount,
       totalPaid,
       totalWaived
@@ -504,28 +509,41 @@ export async function applyWaiver(
       data: {
         studentId: assignment.studentId,
         schoolId,
-        riskLevel: newScore.riskLevel === "high" ? 3 : newScore.riskLevel === "medium" ? 2 : 1, // mapping enum to int
+        riskLevel: newScore.riskLevel === "high" ? 3 : newScore.riskLevel === "medium" ? 2 : 1,
         computedReason: newScore.reason,
       },
     });
 
     return waiver;
   });
+
+  return { ...result, amount: Number(result.amount) };
 }
 
 /**
- * Applies a penalty.
+ * Applies a penalty and recomputes the defaulter score.
  */
 export async function applyPenalty(
   adminId: string,
   transactionId: string,
   data: { amount: number; reason: string }
-): Promise<Penalty> {
+) {
   if (!data.reason || data.reason.trim() === "") {
     throw new Error("A reason is required to apply a penalty.");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
+    const transaction = await tx.transaction.findUnique({
+      where: { id: transactionId },
+      include: {
+        feeAssignment: {
+          include: { student: true }
+        }
+      }
+    });
+
+    if (!transaction) throw new Error("Transaction not found.");
+
     const penalty = await tx.penalty.create({
       data: {
         transactionId,
@@ -543,8 +561,141 @@ export async function applyPenalty(
       },
     });
 
+    // Recompute defaulter score for the student
+    const studentId = transaction.feeAssignment.student.id;
+    const schoolId = transaction.feeAssignment.student.schoolId;
+
+    const studentAssignments = await tx.feeAssignment.findMany({
+      where: { studentId },
+      include: {
+        transactions: { select: { amount: true, reconciliationStatus: true } },
+        waivers: { select: { amount: true } },
+        reminderLogs: { where: { status: { in: ["sent", "simulated_sent"] } } },
+      },
+    });
+
+    let totalAmount = 0;
+    let totalPaid = 0;
+    let totalWaived = 0;
+    let maxDaysOverdue = 0;
+    let brokenPromiseCount = 0;
+
+    for (const a of studentAssignments) {
+      totalAmount += a.amount.toNumber();
+      const pd = calculateAmountPaid(a.transactions);
+      totalPaid += pd;
+      const wv = calculateWaivedAmount(a.waivers);
+      totalWaived += wv;
+      const bal = calculateRemainingBalance(a.amount.toNumber(), pd, wv);
+      if (bal > 0) {
+        const days = Math.max(
+          0,
+          Math.floor((new Date().getTime() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
+        );
+        if (days > 0 && a.reminderLogs) {
+          brokenPromiseCount += a.reminderLogs.length;
+        }
+        if (days > maxDaysOverdue) maxDaysOverdue = days;
+      }
+    }
+
+    const newScore = computeDefaulterScore(
+      maxDaysOverdue,
+      brokenPromiseCount,
+      totalAmount,
+      totalPaid,
+      totalWaived
+    );
+
+    await tx.defaulterScore.create({
+      data: {
+        studentId,
+        schoolId,
+        riskLevel: newScore.riskLevel === "high" ? 3 : newScore.riskLevel === "medium" ? 2 : 1,
+        computedReason: newScore.reason,
+      },
+    });
+
     return penalty;
   });
+
+  return { ...result, amount: Number(result.amount) };
+}
+
+/**
+ * Resolves a flagged anomaly transaction (R3-2).
+ */
+export async function resolveAnomaly(
+  adminId: string,
+  transactionId: string,
+  resolution: "posted" | "reversed",
+  notes?: string
+) {
+  const { adminId: sessionAdminId } = await requireAdminForSchool("");
+  const effectiveAdmin = sessionAdminId || adminId;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const transaction = await tx.transaction.findUnique({
+      where: { id: transactionId },
+      include: { anomalyFlags: true }
+    });
+
+    if (!transaction) throw new Error("Transaction not found.");
+    if (transaction.reconciliationStatus !== "flagged") {
+      throw new Error(`Transaction is not flagged for anomaly (current: ${transaction.reconciliationStatus}).`);
+    }
+
+    // Update anomaly flags
+    if (transaction.anomalyFlags.length > 0) {
+      await tx.anomalyFlag.updateMany({
+        where: { transactionId },
+        data: {
+          resolvedAt: new Date(),
+          resolvedById: effectiveAdmin,
+          resolutionNotes: notes || `Resolved as ${resolution}`,
+        }
+      });
+    }
+
+    // Update transaction status
+    const updated = await tx.transaction.update({
+      where: { id: transactionId },
+      data: { reconciliationStatus: resolution },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: effectiveAdmin,
+        action: "anomaly_resolved",
+        beforeState: { status: "flagged" },
+        afterState: { status: resolution, notes },
+      }
+    });
+
+    return updated;
+  });
+
+  return serializeTransaction(result);
+}
+
+function serializeTransaction(t: any) {
+  if (!t) return t;
+  return {
+    ...t,
+    amount: typeof t.amount === "number" ? t.amount : t.amount?.toNumber ? t.amount.toNumber() : Number(t.amount || 0),
+    feeAssignment: t.feeAssignment
+      ? {
+          ...t.feeAssignment,
+          amount: typeof t.feeAssignment.amount === "number" ? t.feeAssignment.amount : t.feeAssignment.amount?.toNumber ? t.feeAssignment.amount.toNumber() : Number(t.feeAssignment.amount || 0),
+          feeType: t.feeAssignment.feeType
+            ? {
+                ...t.feeAssignment.feeType,
+                gstRate: typeof t.feeAssignment.feeType.gstRate === "number" ? t.feeAssignment.feeType.gstRate : t.feeAssignment.feeType.gstRate?.toNumber ? t.feeAssignment.feeType.gstRate.toNumber() : Number(t.feeAssignment.feeType.gstRate || 0),
+              }
+            : t.feeAssignment.feeType,
+        }
+      : t.feeAssignment,
+  };
 }
 
 /**
@@ -564,14 +715,18 @@ export async function getLedgerSnapshot(
 
   const where: any = { schoolId };
   if (options?.channel) where.channel = options.channel;
-  if (options?.startDate || options?.endDate) {
+  
+  const validStart = options?.startDate && !isNaN(options.startDate.getTime()) ? options.startDate : undefined;
+  const validEnd = options?.endDate && !isNaN(options.endDate.getTime()) ? options.endDate : undefined;
+  
+  if (validStart || validEnd) {
     where.postedAt = {};
-    if (options.startDate) where.postedAt.gte = options.startDate;
-    if (options.endDate) where.postedAt.lte = options.endDate;
+    if (validStart) where.postedAt.gte = validStart;
+    if (validEnd) where.postedAt.lte = validEnd;
   }
 
-  // Only include posted/flagged for total collected, not reversed or pending cheques
-  const collectedWhere = { ...where, reconciliationStatus: { in: ["posted", "flagged"] } };
+  // R3-3: Only include posted for total collected (exclude flagged, reversed, cheque_pending)
+  const collectedWhere = { ...where, reconciliationStatus: "posted" };
   const { _sum } = await prisma.transaction.aggregate({
     where: collectedWhere,
     _sum: { amount: true },
@@ -639,7 +794,7 @@ export async function getLedgerSnapshot(
   ];
 
   return {
-    transactions,
+    transactions: transactions.map(t => serializeTransaction(t)),
     nextCursor,
     totalCollected: _sum.amount?.toNumber() || 0,
     outstandingDuesTotal,

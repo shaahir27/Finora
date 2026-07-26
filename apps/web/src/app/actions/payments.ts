@@ -19,6 +19,7 @@ import {
   type RazorpayOrder,
 } from "@smart-school/payments";
 import { recordPayment } from "./ledger";
+import { requireAdminForSchool } from "@/lib/require-session";
 
 /**
  * Creates a Razorpay sandbox order for a fee assignment's UPI payment.
@@ -90,6 +91,9 @@ export async function reconcileMissedUpiPayment(
   schoolId: string,
   feeAssignmentId: string
 ): Promise<{ found: boolean; posted: boolean; isDuplicate: boolean }> {
+  const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
+  const effectiveAdmin = sessionAdminId || adminId;
+
   const { found, paymentData } = await getMissedUpiPaymentData(razorpayOrderId);
 
   if (!found || !paymentData) {

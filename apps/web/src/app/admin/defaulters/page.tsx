@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getDefaulters, queueRemindersForStudent, escalateDefaulterScore } from "@/app/actions/defaulters";
+import { narrateDefaulterInsightAction } from "@/app/actions/ai";
 import { useDataState } from "@/lib/useDataState";
 import { FiveStateRenderer } from "@/components/FiveStateRenderer";
 import { GlassCard } from "@/components/GlassCard";
@@ -9,15 +10,34 @@ import { QuickActionButton } from "@/components/QuickActionButton";
 import { RiskBadge } from "@/components/RiskBadge";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { DEMO_SCHOOL_ID } from "@/lib/school-context";
 
 export default function DefaultersPage() {
-  const schoolId = "demo-school-id"; // Mocked
+  const schoolId = DEMO_SCHOOL_ID;
   const queryClient = useQueryClient();
+  const [aiInsights, setAiInsights] = useState<Record<string, string>>({});
+  const [loadingAi, setLoadingAi] = useState<Record<string, boolean>>({});
 
   const state = useDataState({
     queryKey: ['defaulters', schoolId],
     queryFn: () => getDefaulters(schoolId),
   });
+
+  const handleFetchAiInsight = async (studentId: string) => {
+    setLoadingAi((prev) => ({ ...prev, [studentId]: true }));
+    try {
+      const insight = await narrateDefaulterInsightAction(schoolId, studentId);
+      if (insight) {
+        setAiInsights((prev) => ({ ...prev, [studentId]: insight }));
+      } else {
+        toast.error("Could not generate AI insight.");
+      }
+    } catch {
+      toast.error("Failed to generate AI insight.");
+    } finally {
+      setLoadingAi((prev) => ({ ...prev, [studentId]: false }));
+    }
+  };
 
   const handleSendReminder = async (studentId: string) => {
     try {
@@ -33,6 +53,7 @@ export default function DefaultersPage() {
   };
 
   const handleEscalate = async (studentId: string) => {
+    if (!confirm("Escalate this student to High risk? This will be visible to all admins immediately.")) return;
     try {
       await escalateDefaulterScore(schoolId, studentId);
       toast.success("Student risk level escalated to High!");
@@ -77,10 +98,21 @@ export default function DefaultersPage() {
                       {defaulter.maxDaysOverdue} days overdue
                     </p>
                     <p className="text-xs text-text-secondary italic">
-                      {defaulter.computedReason}
+                      {aiInsights[defaulter.studentId] ? (
+                        <span className="text-accent-primary-text font-medium">
+                          ✨ AI Insight: {aiInsights[defaulter.studentId]}
+                        </span>
+                      ) : (
+                        defaulter.computedReason
+                      )}
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    <QuickActionButton
+                      label={loadingAi[defaulter.studentId] ? "Analyzing…" : "✨ AI Insight"}
+                      onClick={() => handleFetchAiInsight(defaulter.studentId)}
+                      disabled={loadingAi[defaulter.studentId]}
+                    />
                     <QuickActionButton label="Send Reminder" onClick={() => handleSendReminder(defaulter.studentId)} />
                     <QuickActionButton label="Escalate" onClick={() => handleEscalate(defaulter.studentId)} />
                   </div>

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { generateReconciliationReport } from "@/app/actions/reports";
+import { DEMO_SCHOOL_ID } from "@/lib/school-context";
 
-const SCHOOL_ID = process.env.NEXT_PUBLIC_DEMO_SCHOOL_ID ?? "demo-school";
+const SCHOOL_ID = DEMO_SCHOOL_ID;
 
 export default function AdminReportsPage() {
   const [startDate, setStartDate] = useState(

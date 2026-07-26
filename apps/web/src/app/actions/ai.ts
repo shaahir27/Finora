@@ -25,6 +25,7 @@ import {
   generateWeeklyDigest,
   copilotQuery,
   answerHowDoI,
+  translateTextWithGemini,
   type CopilotMessage,
   type CopilotToolContext,
 } from "@smart-school/ai";
@@ -555,4 +556,26 @@ export async function answerHowDoIAction(
   topic: string
 ): Promise<string> {
   return answerHowDoI(role, topic);
+}
+
+export async function askAdminCopilotAction(schoolId: string, message: string) {
+  return copilotQueryAction("admin", message, [], { schoolId });
+}
+
+export async function getWeeklySummaryDigestAction(schoolId: string) {
+  return generateWeeklyDigestAction(schoolId);
+}
+
+export async function translateMissingTextAction(
+  text: string,
+  targetLocale: string
+): Promise<string> {
+  return translateTextWithGemini(text, targetLocale);
+}
+
+export async function translateBatchMissingTextAction(
+  phrases: string[],
+  targetLocale: string
+): Promise<Record<string, string>> {
+  return translateBatchWithGemini(phrases, targetLocale);
 }

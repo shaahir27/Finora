@@ -7,9 +7,10 @@ import { GlassCard } from "@/components/GlassCard";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { OfflineSyncStatusBadge } from "@/components/OfflineSyncStatusBadge";
 import { useQuery } from "@tanstack/react-query";
+import { DEMO_SCHOOL_ID } from "@/lib/school-context";
 
 export default function OfflineSyncQueuePage() {
-  const schoolId = "demo-school-id"; // Mocked
+  const schoolId = DEMO_SCHOOL_ID;
   const adminId = "admin-123";
 
   const [localQueue, setLocalQueue] = useState<OfflinePaymentEntry[]>([]);

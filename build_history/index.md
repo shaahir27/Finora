@@ -29,11 +29,15 @@ Map of every feature built, where its log lives, and its current status. Updated
 | Hindi Toggle (next-intl) | Session 5 | `session_05_parent_portal/feature_hindi_toggle.md` | Built | 2026-07-24 |
 | Parent Push Notifications | Session 5 | `session_05_parent_portal/feature_parent_push.md` | Built | 2026-07-24 |
 | Parent Copilot + GST Explainer | Session 5 | `session_05_parent_portal/feature_parent_copilot.md` | Built | 2026-07-24 |
+| Parent Cockpit & Multi-Child Overhaul | Session 5 | `session_05_parent_portal/feature_parent_cockpit_multi_child.md` | Built | 2026-07-26 |
 | Receipt Generation & GST Logic | Session 6 | `session_06_polish_and_demo/feature_receipts.md` | Built | 2026-07-24 |
 | Email Reminders via Resend | Session 6 | `session_06_polish_and_demo/feature_reminders_resend.md` | Updated | 2026-07-24 |
 | Reconciliation Reports & Export | Session 6 | `session_06_polish_and_demo/feature_reports.md` | Updated | 2026-07-24 |
 | Action Rate Limiting | Session 6 | `session_06_polish_and_demo/feature_rate_limiting.md` | Built | 2026-07-24 |
 | Codebase Audit & Bug Fixes | Session 6 | `session_06_polish_and_demo/feature_audit_bug_fixes.md` | Built | 2026-07-24 |
-| Real Action Buttons | Session 6 | `session_06_polish_and_demo/feature_real_action_buttons.md` | Built | 2026-07-24 |
+| Audit Report Section A Fixes | Session 6 | `session_06_polish_and_demo/feature_audit_report_section_a.md` | Built | 2026-07-26 |
+| Audit Report Section B Fixes | Session 6 | `session_06_polish_and_demo/feature_audit_report_section_b.md` | Built | 2026-07-26 |
+| UI/UX Overhaul & 3 Workspaces | Session 6 | `session_06_polish_and_demo/feature_ui_ux_overhaul_3_workspaces.md` | Built | 2026-07-26 |
+| Admin Portal Overhaul & Finance Ops | Session 6 | `session_06_polish_and_demo/feature_admin_portal_overhaul.md` | Built | 2026-07-26 |
 
 **Status legend**: `Built` (complete, checkpoint passed) · `Updated` (built earlier, revised in a later session — see the file's own history for what changed) · `Deferred` (started, intentionally incomplete — reason is in the feature's own Section 6, not just here).

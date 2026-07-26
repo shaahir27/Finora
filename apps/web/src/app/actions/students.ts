@@ -3,6 +3,7 @@
 import { prisma, type Student, type StudentStatus, type BalanceDisposition } from "@smart-school/db";
 import { calculateRemainingBalance, calculateWaivedAmount, calculateAmountPaid } from "@smart-school/rules";
 import { applyWaiver } from "./ledger"; // We'll build this in Phase 5
+import { requireAdminForSchool } from "@/lib/require-session";
 
 /**
  * Creates a new student.
@@ -12,6 +13,8 @@ export async function createStudent(
   schoolId: string,
   data: { name: string; class: string; admissionNumber?: string }
 ): Promise<Student> {
+  await requireAdminForSchool(schoolId);
+
   // Enforce admission number uniqueness per school if provided
   if (data.admissionNumber) {
     const existing = await prisma.student.findFirst({
@@ -46,9 +49,21 @@ export async function bulkImportStudents(
   schoolId: string,
   studentsData: Array<{ name: string; class: string; admissionNumber?: string }>
 ) {
+  await requireAdminForSchool(schoolId);
+
   const succeeded: Student[] = [];
   const failed: { row: any; reason: string }[] = [];
   const skipped: Student[] = [];
+
+  const admissionNumbersInFile = studentsData
+    .map((r) => r.admissionNumber)
+    .filter((n): n is string => !!n);
+  const existingStudents = admissionNumbersInFile.length
+    ? await prisma.student.findMany({
+        where: { schoolId, admissionNumber: { in: admissionNumbersInFile } },
+      })
+    : [];
+  const existingByAdmissionNumber = new Map(existingStudents.map((s) => [s.admissionNumber, s]));
 
   for (const row of studentsData) {
     try {
@@ -58,10 +73,7 @@ export async function bulkImportStudents(
       }
 
       if (row.admissionNumber) {
-        const existing = await prisma.student.findFirst({
-          where: { schoolId, admissionNumber: row.admissionNumber },
-        });
-
+        const existing = existingByAdmissionNumber.get(row.admissionNumber);
         if (existing) {
           skipped.push(existing);
           continue;
@@ -93,6 +105,10 @@ export async function updateStudent(
   studentId: string,
   changes: { name?: string; class?: string; admissionNumber?: string }
 ): Promise<Student> {
+  const existing = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!existing) throw new Error("Student not found");
+  await requireAdminForSchool(existing.schoolId);
+
   return prisma.student.update({
     where: { id: studentId },
     data: changes,
@@ -108,6 +124,11 @@ export async function updateStudentStatus(
   adminId: string,
   data: { status: StudentStatus; balanceDisposition?: BalanceDisposition }
 ): Promise<Student> {
+  const targetStudent = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!targetStudent) throw new Error("Student not found");
+  const { adminId: sessionAdminId } = await requireAdminForSchool(targetStudent.schoolId);
+  const effectiveAdminId = sessionAdminId || adminId;
+
   return prisma.$transaction(async (tx) => {
     const student = await tx.student.findUnique({
       where: { id: studentId },
@@ -156,14 +177,14 @@ export async function updateStudentStatus(
             data: {
               feeAssignmentId: assignment.id,
               amount: remaining,
-              approvedById: adminId,
+              approvedById: effectiveAdminId,
               reason: `Write-off on ${data.status}, ${new Date().toISOString().split("T")[0]}`,
             },
           });
 
           await tx.auditLog.create({
             data: {
-              actorId: adminId,
+              actorId: effectiveAdminId,
               action: "waiver_applied_on_exit",
               beforeState: { balance: remaining },
               afterState: { balance: 0 },
@@ -190,6 +211,8 @@ export async function updateStudentStatus(
  * School-scoped read-only aggregation.
  */
 export async function getStudentProfile(schoolId: string, studentId: string) {
+  await requireAdminForSchool(schoolId);
+
   const student = await prisma.student.findFirst({
     where: { id: studentId, schoolId },
     include: {
@@ -215,7 +238,44 @@ export async function getStudentProfile(schoolId: string, studentId: string) {
 
   if (!student) throw new Error("Student not found");
 
-  return student;
+  // Serialize Decimal fields — Next.js cannot pass Prisma Decimal objects to Client Components.
+  return {
+    ...student,
+    feeAssignments: student.feeAssignments.map((a) => ({
+      ...a,
+      amount: Number(a.amount),
+      feeType: {
+        ...a.feeType,
+        gstRate: Number(a.feeType.gstRate),
+      },
+      transactions: a.transactions.map((t) => ({
+        ...t,
+        amount: Number(t.amount),
+        penalties: (t as any).penalties?.map((p: any) => ({ ...p, amount: Number(p.amount) })) ?? [],
+      })),
+      waivers: a.waivers.map((w) => ({
+        ...w,
+        amount: Number(w.amount),
+      })),
+    })),
+    transactions: student.transactions.map((t) => ({
+      ...t,
+      amount: Number(t.amount),
+      penalties: (t as any).penalties?.map((p: any) => ({ ...p, amount: Number(p.amount) })) ?? [],
+      feeAssignment: t.feeAssignment
+        ? {
+            ...t.feeAssignment,
+            amount: Number((t.feeAssignment as any).amount),
+            feeType: t.feeAssignment.feeType
+              ? {
+                  ...(t.feeAssignment as any).feeType,
+                  gstRate: Number((t.feeAssignment as any).feeType?.gstRate),
+                }
+              : null,
+          }
+        : null,
+    })),
+  };
 }
 
 /**
@@ -230,6 +290,8 @@ export async function getStudents(
     limit?: number;
   }
 ) {
+  await requireAdminForSchool(schoolId);
+
   const limit = options?.limit || 50;
   
   const where: any = { schoolId };

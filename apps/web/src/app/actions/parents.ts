@@ -112,9 +112,38 @@ export async function removeStudentFromParent(parentUserId: string, studentId: s
 // ---------------------------------------------------------------------------
 
 /**
- * Gets dues for all children linked to this parent.
+ * Gets all linked active children for a parent user.
  */
-export async function getMyChildrenDues(parentUserId: string) {
+export async function getMyChildren(parentUserId: string) {
+  const parentLink = await prisma.parentLink.findUnique({
+    where: { userId: parentUserId },
+    include: {
+      guardianOf: {
+        include: {
+          student: {
+            select: {
+              id: true,
+              name: true,
+              class: true,
+              admissionNumber: true,
+              status: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!parentLink) return [];
+  return parentLink.guardianOf
+    .map((g) => g.student)
+    .filter((s) => s.status === "active");
+}
+
+/**
+ * Gets dues for all children (or a specific child) linked to this parent.
+ */
+export async function getMyChildrenDues(parentUserId: string, studentId?: string) {
   const parentLink = await prisma.parentLink.findUnique({
     where: { userId: parentUserId },
     include: {
@@ -143,8 +172,9 @@ export async function getMyChildrenDues(parentUserId: string) {
   for (const relation of parentLink.guardianOf) {
     const student = relation.student;
     
-    // Skip non-active students
+    // Skip non-active students or filtered out student
     if (student.status !== "active") continue;
+    if (studentId && student.id !== studentId) continue;
 
     for (const assignment of student.feeAssignments) {
       const amountPaid = calculateAmountPaid(assignment.transactions);
@@ -167,7 +197,9 @@ export async function getMyChildrenDues(parentUserId: string) {
         id: assignment.id,
         studentId: student.id,
         studentName: student.name,
+        studentClass: student.class,
         feeType: assignment.feeType.name,
+        gstRate: Number(assignment.feeType.gstRate),
         amount: assignment.amount.toNumber(),
         amountPaid,
         remainingBalance,
@@ -240,18 +272,34 @@ export async function simulateSandboxPayment(feeAssignmentId: string, amount: nu
 /**
  * Gets payment history for a parent's children.
  */
-export async function getMyPaymentHistory(parentUserId: string, options?: { limit?: number; cursor?: string }) {
+export async function getMyPaymentHistory(
+  parentUserId: string,
+  options?: { studentId?: string; limit?: number; cursor?: string }
+) {
   const limit = options?.limit ?? 20;
 
   const parentLink = await prisma.parentLink.findUnique({
     where: { userId: parentUserId },
-    include: { guardianOf: true },
+    include: {
+      guardianOf: {
+        include: {
+          student: { select: { id: true, name: true } },
+        },
+      },
+    },
   });
 
-  if (!parentLink) return { transactions: [], nextCursor: undefined };
+  if (!parentLink) return { students: [], transactions: [], nextCursor: undefined };
 
-  const studentIds = parentLink.guardianOf.map((g) => g.studentId);
-  if (studentIds.length === 0) return { transactions: [], nextCursor: undefined };
+  const students = parentLink.guardianOf
+    .map((g) => ({ id: g.student.id, name: g.student.name }))
+    .filter((s, idx, self) => self.findIndex((t) => t.id === s.id) === idx);
+
+  let studentIds = students.map((s) => s.id);
+  if (options?.studentId) {
+    studentIds = studentIds.filter((id) => id === options.studentId);
+  }
+  if (studentIds.length === 0) return { students: [], transactions: [], nextCursor: undefined };
 
   const transactions = await prisma.transaction.findMany({
     where: { studentId: { in: studentIds } },
@@ -280,7 +328,67 @@ export async function getMyPaymentHistory(parentUserId: string, options?: { limi
     postedAt: t.postedAt.toISOString(),
   }));
 
-  return { transactions: mapped, nextCursor };
+  return { students, transactions: mapped, nextCursor };
+}
+
+/**
+ * Generates an official Section 80C Tuition Fee Tax Exemption Certificate for a student.
+ */
+export async function generate80CTaxCertificateAction(
+  parentUserId: string,
+  studentId: string,
+  financialYear: string = "2025-2026"
+) {
+  const parentLink = await prisma.parentLink.findUnique({
+    where: { userId: parentUserId },
+    include: {
+      guardianOf: {
+        where: { studentId },
+        include: {
+          student: {
+            include: {
+              feeAssignments: {
+                include: {
+                  feeType: true,
+                  transactions: { where: { reconciliationStatus: "posted" } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!parentLink || parentLink.guardianOf.length === 0) {
+    throw new Error("Student not linked to parent.");
+  }
+
+  const student = parentLink.guardianOf[0].student;
+
+  let totalTuitionPaid = 0;
+  for (const fa of student.feeAssignments) {
+    // Under Section 80C, Tuition Fee paid to Indian educational institutions is deductible
+    if (fa.feeType.name.toLowerCase().includes("tuition")) {
+      const paid = calculateAmountPaid(fa.transactions);
+      totalTuitionPaid += paid;
+    }
+  }
+
+  return {
+    success: true,
+    studentName: student.name,
+    admissionNumber: student.admissionNumber || "N/A",
+    studentClass: student.class,
+    financialYear,
+    section: "Section 80C (Indian Income Tax Act, 1961)",
+    deductibleTuitionAmount: totalTuitionPaid,
+    issuedAt: new Date().toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }),
+  };
 }
 /**
  * Gets the PARENT_LINK id for a given user id.

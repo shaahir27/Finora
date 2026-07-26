@@ -1,6 +1,14 @@
 "use server";
 
-import { prisma, type FeeType, type FeeAssignment, type GstTreatment } from "@smart-school/db";
+import { prisma, type FeeAssignment, type GstTreatment } from "@smart-school/db";
+
+// Helper — strips Prisma Decimal from a FeeType row before it crosses the RSC boundary.
+function serializeFeeType(ft: any) {
+  return {
+    ...ft,
+    gstRate: ft.gstRate !== null && ft.gstRate !== undefined ? Number(ft.gstRate) : null,
+  };
+}
 
 /**
  * Creates a new FeeType for a school.
@@ -14,12 +22,12 @@ export async function createFeeType(
     gstTreatment: GstTreatment;
     gstRate?: number;
   }
-): Promise<FeeType> {
+) {
   if (data.gstTreatment === "taxable" && (data.gstRate === undefined || data.gstRate === null || data.gstRate <= 0)) {
     throw new Error("GST rate is required and must be greater than 0 for taxable fee types.");
   }
 
-  return prisma.feeType.create({
+  const created = await prisma.feeType.create({
     data: {
       schoolId,
       name: data.name,
@@ -29,6 +37,8 @@ export async function createFeeType(
       gstRate: data.gstTreatment === "taxable" ? (data.gstRate as number) : null,
     },
   });
+
+  return serializeFeeType(created);
 }
 
 /**
@@ -44,7 +54,7 @@ export async function updateFeeSchema(
     gstTreatment?: GstTreatment;
     gstRate?: number | null;
   }
-): Promise<FeeType> {
+) {
   // Fetch existing first to validate GST combinations
   const existing = await prisma.feeType.findUnique({ where: { id: feeTypeId } });
   if (!existing) throw new Error("FeeType not found");
@@ -60,13 +70,15 @@ export async function updateFeeSchema(
     newRate = null;
   }
 
-  return prisma.feeType.update({
+  const updated = await prisma.feeType.update({
     where: { id: feeTypeId },
     data: {
       ...changes,
       gstRate: newRate,
     },
   });
+
+  return serializeFeeType(updated);
 }
 
 /**
@@ -81,7 +93,7 @@ export async function assignFee(
   data: { amount: number; dueDate: Date }
 ) {
   const ids = Array.isArray(studentIds) ? studentIds : [studentIds];
-  const succeeded: FeeAssignment[] = [];
+  const succeeded: any[] = [];
   const failed: { studentId: string; reason: string }[] = [];
 
   const feeType = await prisma.feeType.findFirst({
@@ -119,7 +131,9 @@ export async function assignFee(
           dueDate: data.dueDate,
         },
       });
-      succeeded.push(assignment);
+
+      // Serialize Decimal before returning to client
+      succeeded.push({ ...assignment, amount: Number(assignment.amount) });
     } catch (error: any) {
       failed.push({ studentId, reason: error.message || "Unknown error" });
     }

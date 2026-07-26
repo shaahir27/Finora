@@ -1,98 +1,709 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { GlassCard } from "@/components/GlassCard";
+import { useState, useTransition, useEffect } from "react";
 import { getLedgerSnapshot } from "@/app/actions/ledger";
+import { generateReceipt } from "@/app/actions/receipts";
+import { exportTallyXmlReport } from "@/app/actions/reports";
+import { processOcrUploadAction, confirmOcrEntryAction } from "@/app/actions/ai";
+import { getAllEntries, updateEntryStatus, removeEntry, type OfflinePaymentEntry } from "@/lib/offlineQueue";
+import { syncOfflinePayment, getSyncConflicts, resolveSyncConflict } from "@/app/actions/offlineSync";
+import { useDataState } from "@/lib/useDataState";
+import { FiveStateRenderer } from "@/components/FiveStateRenderer";
+import { GlassCard } from "@/components/GlassCard";
+import { QuickActionButton } from "@/components/QuickActionButton";
+import { OfflineSyncStatusBadge } from "@/components/OfflineSyncStatusBadge";
+import { DEMO_SCHOOL_ID } from "@/lib/school-context";
+import { useQuery } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import { BookOpen, ScanLine, WifiOff, Printer, X, Download, FileText, CheckCircle2, AlertTriangle } from "lucide-react";
+import type { OcrExtractionResult } from "@smart-school/ai";
 
-const SCHOOL_ID = process.env.NEXT_PUBLIC_DEMO_SCHOOL_ID ?? "demo-school";
+import { PosReceiptModal } from "@/components/PosReceiptModal";
+import { TransactionActionsModal, type TransactionActionType } from "./TransactionActionsModal";
+
+const CHANNELS = ["all", "upi", "cash", "cheque"] as const;
+
+type OcrStage =
+  | { type: "idle" }
+  | { type: "processing" }
+  | { type: "staged"; stagingId: string; extraction: OcrExtractionResult }
+  | { type: "confirming" }
+  | { type: "confirmed"; transactionId: string }
+  | { type: "error"; message: string };
 
 export default function AdminLedgerPage() {
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const schoolId = DEMO_SCHOOL_ID;
+  const adminId = "demo-admin";
 
-  const fetchTransactions = async () => {
+  // Segmented Workspace Tab: "ledger" | "ocr" | "offline"
+  const [activeTab, setActiveTab] = useState<"ledger" | "ocr" | "offline">("ledger");
+
+  // Ledger Filter State
+  const [channel, setChannel] = useState<typeof CHANNELS[number]>("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+
+  // Modals & Action States
+  const [activeTx, setActiveTx] = useState<any>(null);
+  const [actionType, setActionType] = useState<TransactionActionType | null>(null);
+  const [receiptTx, setReceiptTx] = useState<any>(null);
+  const [posReceiptTx, setPosReceiptTx] = useState<any>(null);
+
+  // OCR Tab States
+  const [ocrImageUrl, setOcrImageUrl] = useState("");
+  const [ocrStage, setOcrStage] = useState<OcrStage>({ type: "idle" });
+  const [isOcrPending, startOcrTransition] = useTransition();
+  const [ocrFeeAssignmentId, setOcrFeeAssignmentId] = useState("");
+  const [ocrAmount, setOcrAmount] = useState("");
+  const [ocrChannel, setOcrChannel] = useState<"cash" | "cheque">("cash");
+  const [ocrRefNumber, setOcrRefNumber] = useState("");
+
+  // Offline Sync States
+  const [localQueue, setLocalQueue] = useState<OfflinePaymentEntry[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  const state = useDataState({
+    queryKey: ["ledgerSnapshot", schoolId, channel, startDate, endDate, cursor],
+    queryFn: () =>
+      getLedgerSnapshot(schoolId, {
+        ...(channel !== "all" ? { channel: channel as "upi" | "cash" | "cheque" } : {}),
+        ...(startDate ? { startDate: new Date(startDate) } : {}),
+        ...(endDate ? { endDate: new Date(endDate + "T23:59:59") } : {}),
+        ...(cursor ? { cursor } : {}),
+        limit: 50,
+      }),
+  });
+
+  const { data: serverConflicts = [], refetch: refetchConflicts } = useQuery({
+    queryKey: ['syncConflicts', schoolId],
+    queryFn: () => getSyncConflicts(schoolId)
+  });
+
+  const loadLocalQueue = async () => {
     try {
-      const data = await getLedgerSnapshot(SCHOOL_ID);
-      setTransactions(data.transactions);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+      const entries = await getAllEntries();
+      setLocalQueue(entries);
+    } catch (err) {
+      console.error("Failed to load offline queue", err);
     }
   };
 
   useEffect(() => {
-    fetchTransactions();
-  }, []);
+    if (activeTab === "offline") {
+      loadLocalQueue();
+    }
+  }, [activeTab]);
+
+  const openAction = (tx: any, type: TransactionActionType) => {
+    setActiveTx(tx);
+    setActionType(type);
+  };
+
+  const handleGenerateReceipt = async (txId: string, format: "a4" | "thermal") => {
+    const win = window.open("about:blank", "_blank");
+    try {
+      const res = await generateReceipt(txId, format);
+      if (win) {
+        win.location.href = res.pdfUrl;
+      } else {
+        window.location.href = res.pdfUrl;
+      }
+      toast.success(`Generated ${format.toUpperCase()} receipt`);
+    } catch (e: any) {
+      if (win) win.close();
+      toast.error(`Receipt generation failed: ${e.message}`);
+    }
+  };
+
+  // OCR Processing Handlers
+  const handleOcrProcess = () => {
+    if (!ocrImageUrl.trim()) return;
+    setOcrStage({ type: "processing" });
+    startOcrTransition(async () => {
+      try {
+        const result = await processOcrUploadAction(schoolId, ocrImageUrl.trim());
+        setOcrStage({ type: "staged", stagingId: result.stagingId, extraction: result.extraction });
+        if (result.extraction.amount) setOcrAmount(String(result.extraction.amount));
+        if (result.extraction.refNumber) setOcrRefNumber(result.extraction.refNumber);
+        toast.success("Document analyzed by Gemini");
+      } catch (err: any) {
+        setOcrStage({ type: "error", message: err.message || "OCR processing failed" });
+        toast.error("Failed to analyze image");
+      }
+    });
+  };
+
+  const handleOcrConfirm = () => {
+    if (ocrStage.type !== "staged") return;
+    if (!ocrFeeAssignmentId || !ocrAmount || Number(ocrAmount) <= 0) return;
+
+    setOcrStage({ type: "confirming" });
+    startOcrTransition(async () => {
+      try {
+        const result = await confirmOcrEntryAction(adminId, schoolId, ocrStage.stagingId, {
+          feeAssignmentId: ocrFeeAssignmentId,
+          amount: Number(ocrAmount),
+          channel: ocrChannel,
+          ...(ocrRefNumber ? { refNumber: ocrRefNumber } : {}),
+        });
+        setOcrStage({ type: "confirmed", transactionId: result.transaction.id });
+        toast.success("Transaction posted to ledger");
+      } catch (err: any) {
+        setOcrStage({ type: "error", message: err.message || "Confirmation failed" });
+        toast.error("Failed to post transaction");
+      }
+    });
+  };
+
+  // Offline Sync Handlers
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      const entries = await getAllEntries();
+      const queued = entries.filter(e => e.status === "queued" || e.status === "conflict");
+
+      for (const entry of queued) {
+        await updateEntryStatus(entry.local_id, "syncing");
+        await loadLocalQueue();
+
+        const res = await syncOfflinePayment(
+          entry.local_id,
+          entry.fee_assignment_id,
+          entry.channel,
+          entry.amount,
+          entry.queued_at,
+          adminId,
+          schoolId,
+          entry.ref_number
+        );
+
+        if (res.success) {
+          await removeEntry(entry.local_id);
+        } else {
+          await updateEntryStatus(entry.local_id, "conflict");
+        }
+      }
+      await loadLocalQueue();
+      await refetchConflicts();
+      toast.success("Offline sync completed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleResolveConflict = async (conflictId: string, action: "discarded" | "reentered_adjusted") => {
+    const reason = prompt(`Reason for resolving as ${action}:`);
+    if (!reason) return;
+
+    setResolvingId(conflictId);
+    try {
+      await resolveSyncConflict(conflictId, adminId, action, reason);
+      await refetchConflicts();
+      toast.success("Conflict resolved");
+    } catch (err: any) {
+      toast.error("Failed to resolve conflict: " + err.message);
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 font-sans">
+      {/* Workspace Header */}
       <div>
-        <h1 className="text-3xl font-bold text-text-primary tracking-tight">Ledger</h1>
-        <p className="text-text-secondary mt-1">Full transaction history and financial records.</p>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Finance Operations</h1>
+        <p className="text-text-secondary text-sm">Master ledger journal, statement/cheque scanner & offline sync queue.</p>
       </div>
 
-      <GlassCard className="p-6">
-        {loading ? (
-          <div className="flex justify-center p-8">
-            <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin border-accent-primary/40" />
+      {/* Top Segmented Workspace Controller */}
+      <div className="flex bg-white/70 p-1.5 rounded-2xl border border-border-glass max-w-2xl shadow-sm">
+        <button
+          onClick={() => setActiveTab("ledger")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
+            activeTab === "ledger"
+              ? "bg-[#0F5A47] text-white shadow-md"
+              : "text-text-secondary hover:text-text-primary hover:bg-black/5"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Master Ledger
+        </button>
+        <button
+          onClick={() => setActiveTab("ocr")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
+            activeTab === "ocr"
+              ? "bg-[#0F5A47] text-white shadow-md"
+              : "text-text-secondary hover:text-text-primary hover:bg-black/5"
+          }`}
+        >
+          <ScanLine className="w-4 h-4" />
+          OCR Scanner
+        </button>
+        <button
+          onClick={() => setActiveTab("offline")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
+            activeTab === "offline"
+              ? "bg-[#0F5A47] text-white shadow-md"
+              : "text-text-secondary hover:text-text-primary hover:bg-black/5"
+          }`}
+        >
+          <WifiOff className="w-4 h-4" />
+          Offline Sync
+        </button>
+      </div>
+
+      {/* TAB 1: MASTER LEDGER */}
+      {activeTab === "ledger" && (
+        <div className="space-y-6">
+          <GlassCard className="flex flex-wrap gap-4 items-end justify-between p-4 border-[#0F5A47]/15">
+            <div className="flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Channel Filter</label>
+                <select
+                  value={channel}
+                  onChange={(e) => {
+                    setCursor(undefined);
+                    setChannel(e.target.value as typeof channel);
+                  }}
+                  className="bg-white border border-border-glass rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                >
+                  {CHANNELS.map((c) => (
+                    <option key={c} value={c}>
+                      {c.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setCursor(undefined);
+                    setStartDate(e.target.value);
+                  }}
+                  className="bg-white border border-border-glass rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setCursor(undefined);
+                    setEndDate(e.target.value);
+                  }}
+                  className="bg-white border border-border-glass rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                try {
+                  const res = await exportTallyXmlReport(schoolId, startDate, endDate);
+                  window.open(res.url, "_blank");
+                  toast.success(`Exported ${res.count} Tally XML Vouchers`);
+                } catch (err: any) {
+                  toast.error(err.message || "Tally export failed");
+                }
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-bold rounded-xl shadow-sm hover:opacity-95 transition-all flex items-center gap-1.5"
+            >
+              <span>📊 Export Tally XML</span>
+            </button>
+          </GlassCard>
+
+          <FiveStateRenderer state={state}>
+            {(data) => (
+              <GlassCard className="overflow-x-auto p-4 border-[#0F5A47]/15">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-[10px] uppercase tracking-wider text-text-secondary bg-white/80 border-b border-border-glass">
+                    <tr>
+                      <th className="px-3.5 py-3 font-extrabold">Date</th>
+                      <th className="px-3.5 py-3 font-extrabold">Ref ID</th>
+                      <th className="px-3.5 py-3 font-extrabold">Student</th>
+                      <th className="px-3.5 py-3 font-extrabold">Channel</th>
+                      <th className="px-3.5 py-3 text-right font-extrabold">Amount</th>
+                      <th className="px-3.5 py-3 font-extrabold">Status</th>
+                      <th className="px-3.5 py-3 text-right font-extrabold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-glass">
+                    {data.transactions.map((t: any) => (
+                      <tr key={t.id} className="hover:bg-white/60 transition-colors">
+                        <td className="px-3.5 py-3.5 text-text-primary text-xs font-medium">
+                          {new Date(t.postedAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-3.5 py-3.5 font-mono text-[11px] font-bold text-text-secondary">
+                          #{t.refNumber || t.id.slice(-6)}
+                        </td>
+                        <td className="px-3.5 py-3.5 text-text-primary font-bold text-xs">
+                          {t.studentName ?? t.student?.name ?? "—"}
+                        </td>
+                        <td className="px-3.5 py-3.5">
+                          <span
+                            className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-md border ${
+                              t.channel?.toLowerCase() === "upi"
+                                ? "bg-[#059669]/10 text-[#059669] border-[#059669]/20"
+                                : t.channel?.toLowerCase() === "cash"
+                                ? "bg-blue-500/10 text-blue-700 border-blue-500/20"
+                                : "bg-amber-500/10 text-amber-700 border-amber-500/20"
+                            }`}
+                          >
+                            {t.channel}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3.5 text-right font-extrabold text-[#0F5A47] text-sm">
+                          ₹{Number(t.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-3.5 py-3.5">
+                          <span
+                            className={`px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full tracking-wider ${
+                              t.reconciliationStatus === "posted"
+                                ? "bg-[#059669]/10 text-[#059669] border border-[#059669]/20"
+                                : t.reconciliationStatus === "cheque_pending"
+                                ? "bg-[#D97706]/10 text-[#D97706] border border-[#D97706]/20"
+                                : t.reconciliationStatus === "flagged"
+                                ? "bg-[#DC2626]/10 text-[#DC2626] border border-[#DC2626]/20"
+                                : "bg-[#64748B]/10 text-[#64748B] border border-[#64748B]/20"
+                            }`}
+                          >
+                            {t.reconciliationStatus}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3.5 text-right">
+                          {t.reconciliationStatus === "reversed" ? (
+                            <span className="text-[10px] text-text-secondary font-bold italic">No Actions</span>
+                          ) : (
+                            <select
+                              defaultValue=""
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                e.target.value = ""; // Reset after selection
+                                if (val === "receipt") setReceiptTx(t);
+                                else if (val === "pos_receipt") setPosReceiptTx(t);
+                                else if (val === "clear_cheque") openAction(t, "clear_cheque");
+                                else if (val === "bounce_cheque") openAction(t, "bounce_cheque");
+                                else if (val === "resolve_anomaly") openAction(t, "resolve_anomaly");
+                                else if (val === "apply_penalty") openAction(t, "apply_penalty");
+                                else if (val === "reverse") openAction(t, "reverse");
+                              }}
+                              className="bg-white border border-[#0F5A47]/25 hover:border-[#0F5A47] text-[#0F5A47] text-xs font-bold px-3 py-1.5 rounded-xl outline-none transition-all shadow-xs cursor-pointer"
+                            >
+                              <option value="" disabled>Manage Options ▾</option>
+                              {t.reconciliationStatus === "posted" && (
+                                <>
+                                  <option value="receipt">📄 Download A4 Receipt</option>
+                                  <option value="pos_receipt">🖨️ POS 80mm Receipt</option>
+                                  <option value="apply_penalty">🏷️ Apply Late Penalty</option>
+                                  <option value="reverse">🔄 Reverse Entry</option>
+                                </>
+                              )}
+                              {t.reconciliationStatus === "cheque_pending" && (
+                                <>
+                                  <option value="clear_cheque">✅ Clear Cheque</option>
+                                  <option value="bounce_cheque">❌ Mark Bounced</option>
+                                </>
+                              )}
+                              {t.reconciliationStatus === "flagged" && (
+                                <option value="resolve_anomaly">⚠️ Resolve Anomaly</option>
+                              )}
+                            </select>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {data.transactions.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-text-secondary text-sm">
+                          No transactions found for this filter.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </GlassCard>
+            )}
+          </FiveStateRenderer>
+        </div>
+      )}
+
+      {/* TAB 2: OCR SCANNER */}
+      {activeTab === "ocr" && (
+        <div className="max-w-3xl space-y-6">
+          <GlassCard className="space-y-4 p-6 border-[#0F5A47]/15">
+            <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+              <ScanLine className="w-5 h-5 text-[#0F5A47]" />
+              Upload Statement or Cheque Image
+            </h2>
+            <p className="text-xs text-text-secondary">
+              Upload a physical cheque or bank receipt image URL to extract details via Gemini AI. Staged previews do not affect ledger balances until confirmed.
+            </p>
+            <div className="flex gap-3">
+              <input
+                type="url"
+                value={ocrImageUrl}
+                onChange={(e) => setOcrImageUrl(e.target.value)}
+                placeholder="https://your-storage.supabase.co/receipt.jpg"
+                disabled={ocrStage.type === "processing" || isOcrPending}
+                className="flex-1 rounded-xl px-4 py-2.5 text-xs text-text-primary bg-white border border-border-glass focus:outline-none focus:border-[#0F5A47]"
+              />
+              <button
+                type="button"
+                onClick={handleOcrProcess}
+                disabled={!ocrImageUrl.trim() || isOcrPending || ocrStage.type === "processing"}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] shadow-md hover:opacity-95 disabled:opacity-40 transition-all"
+              >
+                {ocrStage.type === "processing" ? "Analyzing..." : "Analyze with Gemini"}
+              </button>
+            </div>
+          </GlassCard>
+
+          {(ocrStage.type === "staged" || ocrStage.type === "confirming") && (
+            <GlassCard className="space-y-4 p-6 border-[#0F5A47]/20">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-bold text-text-primary">Staged Extraction Preview</h3>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#059669]/10 text-[#059669] border border-[#059669]/20">
+                  {ocrStage.type === "staged" ? `${ocrStage.extraction.confidence} confidence` : "Processing"}
+                </span>
+              </div>
+
+              {ocrStage.type === "staged" && ocrStage.extraction.extractionNotes && (
+                <div className="text-xs p-3 rounded-xl bg-white/80 border border-border-glass text-text-secondary">
+                  <span className="font-semibold text-text-primary">Gemini notes: </span>
+                  {ocrStage.extraction.extractionNotes}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Fee Assignment ID *</label>
+                  <input
+                    type="text"
+                    value={ocrFeeAssignmentId}
+                    onChange={(e) => setOcrFeeAssignmentId(e.target.value)}
+                    placeholder="Fee assignment ID"
+                    className="w-full rounded-xl px-3 py-2 text-xs bg-white border border-border-glass focus:outline-none focus:border-[#0F5A47]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Amount (₹) *</label>
+                  <input
+                    type="number"
+                    value={ocrAmount}
+                    onChange={(e) => setOcrAmount(e.target.value)}
+                    className="w-full rounded-xl px-3 py-2 text-xs bg-white border border-border-glass focus:outline-none focus:border-[#0F5A47]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Channel *</label>
+                  <select
+                    value={ocrChannel}
+                    onChange={(e) => setOcrChannel(e.target.value as "cash" | "cheque")}
+                    className="w-full rounded-xl px-3 py-2 text-xs bg-white border border-border-glass focus:outline-none focus:border-[#0F5A47]"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="cheque">Cheque</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Reference / Cheque No.</label>
+                  <input
+                    type="text"
+                    value={ocrRefNumber}
+                    onChange={(e) => setOcrRefNumber(e.target.value)}
+                    placeholder="Ref or cheque number"
+                    className="w-full rounded-xl px-3 py-2 text-xs bg-white border border-border-glass focus:outline-none focus:border-[#0F5A47]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleOcrConfirm}
+                  disabled={!ocrFeeAssignmentId || !ocrAmount || Number(ocrAmount) <= 0 || isOcrPending}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#0F5A47] hover:bg-[#0D7A5F] shadow-md transition-all disabled:opacity-40"
+                >
+                  Confirm & Post to Master Ledger
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOcrStage({ type: "idle" })}
+                  className="px-4 py-2.5 rounded-xl text-xs font-medium text-text-secondary hover:bg-black/5"
+                >
+                  Cancel
+                </button>
+              </div>
+            </GlassCard>
+          )}
+
+          {ocrStage.type === "confirmed" && (
+            <GlassCard className="p-6 border-[#059669]/30 bg-[#059669]/5 space-y-2">
+              <h3 className="text-sm font-bold text-[#059669]">✓ Payment Successfully Posted</h3>
+              <p className="text-xs text-text-secondary">Transaction ID: {ocrStage.transactionId}</p>
+              <button
+                type="button"
+                onClick={() => setOcrStage({ type: "idle" })}
+                className="mt-2 text-xs font-bold text-[#0F5A47] underline"
+              >
+                Scan Another Document
+              </button>
+            </GlassCard>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: OFFLINE SYNC */}
+      {activeTab === "offline" && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-base font-bold text-text-primary">Local Pending Queue & Conflicts</h2>
+            <button
+              onClick={handleSyncNow}
+              disabled={syncing}
+              className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] shadow-md hover:opacity-95 disabled:opacity-50 transition-all"
+            >
+              {syncing ? "Syncing Network..." : "Sync Now"}
+            </button>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="border-b border-border-glass text-text-secondary">
-                  <th className="pb-3 font-medium pl-4">Transaction ID</th>
-                  <th className="pb-3 font-medium">Student</th>
-                  <th className="pb-3 font-medium">Channel</th>
-                  <th className="pb-3 font-medium">Amount</th>
-                  <th className="pb-3 font-medium">Type</th>
-                  <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="border-b border-border-glass/50 hover:bg-white/5 transition-colors">
-                    <td className="py-4 pl-4 font-mono text-xs text-text-secondary">
-                      {tx.id.split("-")[0]}...
-                    </td>
-                    <td className="py-4 font-medium text-text-primary">{tx.studentName}</td>
-                    <td className="py-4 text-text-secondary capitalize">{tx.channel}</td>
-                    <td className="py-4 text-text-primary font-medium">
-                      {tx.type === "payment" ? "+" : "-"}₹{tx.amount}
-                    </td>
-                    <td className="py-4 text-text-secondary capitalize">{tx.type}</td>
-                    <td className="py-4">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          tx.reconciliationStatus === "posted"
-                            ? "bg-green-500/10 text-green-500"
-                            : tx.reconciliationStatus === "failed"
-                            ? "bg-red-500/10 text-red-500"
-                            : "bg-yellow-500/10 text-yellow-500"
-                        }`}
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Device Queue ({localQueue.length})</h3>
+            {localQueue.length === 0 ? (
+              <GlassCard className="p-6 text-center text-xs text-text-secondary">
+                No offline payments queued on this browser session.
+              </GlassCard>
+            ) : (
+              localQueue.map(entry => (
+                <GlassCard key={entry.local_id} weight="list-row" className="flex justify-between items-center p-4">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-text-primary uppercase text-xs">{entry.channel}</span>
+                      <span className="text-[#0F5A47] font-bold text-sm">₹{entry.amount}</span>
+                      <OfflineSyncStatusBadge status={entry.status} />
+                    </div>
+                    <p className="text-[11px] text-text-secondary mt-1">Queued at: {new Date(entry.queued_at).toLocaleString()}</p>
+                  </div>
+                </GlassCard>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-3 pt-4">
+            <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Server Sync Conflicts ({serverConflicts.length})</h3>
+            {serverConflicts.length === 0 ? (
+              <GlassCard className="p-6 text-center text-xs text-text-secondary">
+                No unresolved sync conflicts across the school.
+              </GlassCard>
+            ) : (
+              serverConflicts.map(conflict => (
+                <GlassCard key={conflict.id} weight="list-row" className="border-red-500/30 p-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-text-primary uppercase text-xs">{conflict.channel}</span>
+                        <span className="text-text-primary font-bold text-sm">₹{conflict.amount.toString()}</span>
+                        <OfflineSyncStatusBadge status="conflict" />
+                      </div>
+                      <p className="text-xs text-red-600 font-medium mt-1">Conflict Reason: {conflict.conflictReason}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleResolveConflict(conflict.id, "discarded")}
+                        disabled={resolvingId === conflict.id}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-500/10 text-red-700 hover:bg-red-500/20"
                       >
-                        {tx.reconciliationStatus}
-                      </span>
-                    </td>
-                    <td className="py-4 text-text-secondary">
-                      {new Date(tx.postedAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-                {transactions.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-text-secondary">
-                      No transactions found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                        Discard
+                      </button>
+                      <button
+                        onClick={() => handleResolveConflict(conflict.id, "reentered_adjusted")}
+                        disabled={resolvingId === conflict.id}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#0F5A47]/10 text-[#0F5A47] hover:bg-[#0F5A47]/20"
+                      >
+                        Resolve Re-entered
+                      </button>
+                    </div>
+                  </div>
+                </GlassCard>
+              ))
+            )}
           </div>
-        )}
-      </GlassCard>
+        </div>
+      )}
+
+      {/* Inline Receipt Modal */}
+      {receiptTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-[#F4F1EA] rounded-2xl p-6 max-w-md w-full border border-border-glass shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-border-glass pb-3">
+              <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <Printer className="w-5 h-5 text-[#0F5A47]" />
+                Download GST Receipt
+              </h3>
+              <button onClick={() => setReceiptTx(null)} className="text-text-secondary hover:text-text-primary">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-1 text-xs text-text-secondary">
+              <p><span className="font-semibold text-text-primary">Student:</span> {receiptTx.studentName ?? receiptTx.student?.name}</p>
+              <p><span className="font-semibold text-text-primary">Amount:</span> ₹{receiptTx.amount}</p>
+              <p><span className="font-semibold text-text-primary">Channel:</span> {receiptTx.channel.toUpperCase()}</p>
+              <p><span className="font-semibold text-text-primary">Date:</span> {new Date(receiptTx.postedAt).toLocaleDateString()}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => {
+                  handleGenerateReceipt(receiptTx.id, "a4");
+                  setReceiptTx(null);
+                }}
+                className="py-2.5 px-4 rounded-xl bg-white border border-border-glass text-xs font-bold text-text-primary hover:bg-black/5 flex items-center justify-center gap-1.5"
+              >
+                <FileText className="w-4 h-4 text-[#0F5A47]" />
+                A4 PDF Receipt
+              </button>
+              <button
+                onClick={() => {
+                  handleGenerateReceipt(receiptTx.id, "thermal");
+                  setReceiptTx(null);
+                }}
+                className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-bold shadow-md hover:opacity-95 flex items-center justify-center gap-1.5"
+              >
+                <Printer className="w-4 h-4" />
+                Thermal Receipt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Actions Modal (Anomaly, Clear, Bounce, Reverse, Penalty) */}
+      {activeTx && actionType && (
+        <TransactionActionsModal
+          adminId={adminId}
+          schoolId={schoolId}
+          transaction={activeTx}
+          actionType={actionType}
+          onClose={() => {
+            setActiveTx(null);
+            setActionType(null);
+          }}
+          onSuccess={() => window.location.reload()}
+        />
+      )}
+
+      {/* POS Thermal Receipt (80mm) Modal */}
+      {posReceiptTx && (
+        <PosReceiptModal
+          transaction={posReceiptTx}
+          onClose={() => setPosReceiptTx(null)}
+        />
+      )}
     </div>
   );
 }

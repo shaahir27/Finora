@@ -5,10 +5,15 @@ import {
   calculateAmountPaid,
   calculateWaivedAmount,
   calculateRemainingBalance,
-  computeDefaulterScore
+  computeDefaulterScore,
+  evaluateReminderTrigger
 } from "@smart-school/rules";
+import { requireAdminForSchool } from "@/lib/require-session";
+import { draftReminderTextAction } from "./ai";
 
 export async function getDefaulters(schoolId: string) {
+  await requireAdminForSchool(schoolId);
+
   // 1. Fetch all active students and their fee assignments (with transactions and waivers)
   const students = await prisma.student.findMany({
     where: { schoolId, status: "active" },
@@ -16,7 +21,8 @@ export async function getDefaulters(schoolId: string) {
       feeAssignments: {
         include: {
           transactions: { select: { amount: true, reconciliationStatus: true } },
-          waivers: { select: { amount: true } }
+          waivers: { select: { amount: true } },
+          reminderLogs: { where: { status: { in: ["sent", "simulated_sent"] } } }
         }
       }
     }
@@ -29,6 +35,7 @@ export async function getDefaulters(schoolId: string) {
     let totalPaid = 0;
     let totalWaived = 0;
     let maxDaysOverdue = 0;
+    let brokenPromiseCount = 0;
 
     for (const a of student.feeAssignments) {
       totalAmount += a.amount.toNumber();
@@ -42,14 +49,16 @@ export async function getDefaulters(schoolId: string) {
           0,
           Math.floor((Date.now() - a.dueDate.getTime()) / (1000 * 60 * 60 * 24))
         );
+        if (days > 0 && a.reminderLogs) {
+          brokenPromiseCount += a.reminderLogs.length;
+        }
         if (days > maxDaysOverdue) maxDaysOverdue = days;
       }
     }
 
-    // TODO: broken_promise_count requires REMINDER_LOG join. Hardcoded to 0 for this session.
     const score = computeDefaulterScore(
       maxDaysOverdue,
-      0, 
+      brokenPromiseCount, 
       totalAmount,
       totalPaid,
       totalWaived
@@ -72,17 +81,16 @@ export async function getDefaulters(schoolId: string) {
       });
 
       // Upsert: update today's score if it already exists, otherwise create.
-      // Fix: previously create() was called on every getDefaulters() invocation, inserting
-      // duplicate rows on every page load and growing the table unboundedly.
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
       const existingToday = await prisma.defaulterScore.findFirst({
         where: {
           studentId: student.id,
-          computedAt: { gte: todayStart },
+          schoolId,
+          computedAt: { gte: todayStart }
         },
-        orderBy: { computedAt: "desc" },
+        orderBy: { computedAt: "desc" }
       });
 
       if (existingToday) {
@@ -90,8 +98,8 @@ export async function getDefaulters(schoolId: string) {
           where: { id: existingToday.id },
           data: {
             riskLevel: riskLevelInt,
-            computedReason: score.reason,
-          },
+            computedReason: score.reason
+          }
         });
       } else {
         await prisma.defaulterScore.create({
@@ -99,8 +107,8 @@ export async function getDefaulters(schoolId: string) {
             studentId: student.id,
             schoolId,
             riskLevel: riskLevelInt,
-            computedReason: score.reason,
-          },
+            computedReason: score.reason
+          }
         });
       }
     }
@@ -116,39 +124,55 @@ export async function getDefaulters(schoolId: string) {
 }
 
 export async function queueRemindersForStudent(schoolId: string, studentId: string) {
-  const assignments = await prisma.feeAssignment.findMany({
-    where: { studentId, dueDate: { lt: new Date() } },
+  await requireAdminForSchool(schoolId);
+
+  const student = await prisma.student.findFirst({
+    where: { id: studentId, schoolId },
     include: {
-      student: { select: { schoolId: true } },
-      transactions: true,
-      waivers: true,
+      feeAssignments: {
+        include: {
+          transactions: { select: { amount: true, reconciliationStatus: true } },
+          waivers: { select: { amount: true } },
+          reminderLogs: { select: { tier: true } },
+        }
+      }
     }
   });
 
-  const studentAssignments = assignments.filter(a => a.student.schoolId === schoolId);
+  if (!student) throw new Error("Student not found");
+
   let queuedCount = 0;
 
-  for (const fa of studentAssignments) {
+  for (const fa of student.feeAssignments) {
     const paid = calculateAmountPaid(fa.transactions);
     const waived = calculateWaivedAmount(fa.waivers);
     const remainingBalance = calculateRemainingBalance(fa.amount.toNumber(), paid, waived);
 
     if (remainingBalance > 0) {
-      const existing = await prisma.reminderLog.findFirst({
-        where: { feeAssignmentId: fa.id, tier: 1 }
-      });
-      
-      if (!existing) {
-        await prisma.reminderLog.create({
-          data: {
-            feeAssignmentId: fa.id,
-            tier: 1,
-            channel: "email",
-            draftedText: `This is an automated reminder regarding your overdue payment of ₹${remainingBalance}.`,
-            status: "logged",
-          }
-        });
-        queuedCount++;
+      const daysOverdue = Math.max(
+        0,
+        Math.floor((Date.now() - fa.dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      );
+      const highestTier = fa.reminderLogs.reduce((max, log) => Math.max(max, log.tier), 0);
+      const trigger = evaluateReminderTrigger(daysOverdue, highestTier);
+
+      if (trigger.shouldTrigger) {
+        try {
+          const tierDays = (trigger.newTier === 1 ? 1 : trigger.newTier === 2 ? 7 : 14) as 1 | 7 | 14;
+          await draftReminderTextAction(schoolId, fa.id, tierDays, "email");
+          queuedCount++;
+        } catch {
+          await prisma.reminderLog.create({
+            data: {
+              feeAssignmentId: fa.id,
+              tier: trigger.newTier,
+              channel: "email",
+              draftedText: `This is an automated reminder regarding your overdue payment of ₹${remainingBalance}.`,
+              status: "logged",
+            }
+          });
+          queuedCount++;
+        }
       }
     }
   }
@@ -157,6 +181,8 @@ export async function queueRemindersForStudent(schoolId: string, studentId: stri
 }
 
 export async function escalateDefaulterScore(schoolId: string, studentId: string) {
+  const { adminId } = await requireAdminForSchool(schoolId);
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -169,12 +195,15 @@ export async function escalateDefaulterScore(schoolId: string, studentId: string
     orderBy: { computedAt: "desc" },
   });
 
+  const previousReason = existingToday?.computedReason ?? "No prior score today";
+  const escalationNote = `Manually escalated by admin (was: "${previousReason}")`;
+
   if (existingToday) {
     await prisma.defaulterScore.update({
       where: { id: existingToday.id },
       data: {
         riskLevel: 3,
-        computedReason: "Manual escalation by admin",
+        computedReason: escalationNote,
       },
     });
   } else {
@@ -183,25 +212,38 @@ export async function escalateDefaulterScore(schoolId: string, studentId: string
         studentId,
         schoolId,
         riskLevel: 3,
-        computedReason: "Manual escalation by admin",
+        computedReason: escalationNote,
       },
     });
   }
 
-  const admin = await prisma.user.findFirst({
-    where: { schoolId, role: "admin" }
+  await prisma.auditLog.create({
+    data: {
+      actorId: adminId,
+      action: "defaulter_score_manually_escalated",
+      beforeState: existingToday ? { riskLevel: existingToday.riskLevel, reason: existingToday.computedReason } : {},
+      afterState: { riskLevel: 3, reason: escalationNote, studentId },
+    },
   });
 
-  if (admin) {
-    await prisma.auditLog.create({
-      data: {
-        actorId: admin.id,
-        action: "manual_escalation",
-        beforeState: existingToday ? { riskLevel: existingToday.riskLevel } : {},
-        afterState: { riskLevel: 3 },
-      }
-    });
+  return { success: true };
+}
+
+/**
+ * Triggers batch reminder generation for multiple defaulter students at once.
+ */
+export async function batchQueueRemindersAction(schoolId: string, studentIds: string[]) {
+  await requireAdminForSchool(schoolId);
+
+  let totalQueued = 0;
+  for (const studentId of studentIds) {
+    try {
+      const res = await queueRemindersForStudent(schoolId, studentId);
+      totalQueued += res.queuedCount;
+    } catch (e) {
+      console.error(`Batch reminder failed for student ${studentId}:`, e);
+    }
   }
 
-  return { success: true };
+  return { success: true, count: totalQueued };
 }
