@@ -130,35 +130,6 @@ function AmbientParticlesCanvas() {
   return <canvas id="ambient-particles" className="absolute inset-0 pointer-events-none z-0" />;
 }
 
-function InfiniteMarquee() {
-  const items = [
-    "⚡ 99.8% Automated Match Rate",
-    "📊 Tally Prime XML Export Ready",
-    "📢 Bilingual AI Voice Soundbox",
-    "📜 Section 80C Tax Cert Generator",
-    "🛡️ Smart 24h Reminder Muting",
-    "💳 Flexible Micro-Installments",
-    "🔐 Audit-Backed Ledger Waivers",
-  ];
-
-  return (
-    <div className="w-full bg-[#0F5A47] text-white py-3 overflow-hidden border-y border-[#0F5A47]/30 shadow-md relative z-20">
-      <motion.div
-        animate={{ x: ["0%", "-50%"] }}
-        transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-        className="flex whitespace-nowrap gap-12 text-xs font-extrabold tracking-wider uppercase"
-      >
-        {[...items, ...items].map((text, idx) => (
-          <span key={idx} className="flex items-center gap-3">
-            <span>{text}</span>
-            <span className="text-emerald-300">•</span>
-          </span>
-        ))}
-      </motion.div>
-    </div>
-  );
-}
-
 // ─── Interactive 3D Mouse Tilt & Radial Spotlight Glow ──────────────────────────
 
 function TiltSpotlightCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -928,7 +899,7 @@ export default function HomePage() {
 
       <main className="relative z-10">
         <Hero />
-        <InfiniteMarquee />
+
         <LiveTerminalShowcase />
         <FlagshipInnovations />
         <ImpactMetrics />
