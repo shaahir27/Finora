@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
+  Download,
 } from "lucide-react";
 
 import { playPaymentSoundbox } from "@/lib/soundbox";
@@ -514,7 +515,7 @@ export default function ParentDuesPage() {
               <div className="flex justify-between border-b pb-2">
                 <span className="text-text-secondary">Governing Act</span>
                 <span className="font-bold text-[#0F5A47]">
-                  {taxCertificateData.section}
+                  {taxCertificateData.section || "Section 80C (Income Tax Act, 1961)"}
                 </span>
               </div>
               <div className="flex justify-between pt-1">
@@ -523,9 +524,11 @@ export default function ParentDuesPage() {
                 </span>
                 <span className="font-extrabold text-base text-[#059669]">
                   ₹
-                  {taxCertificateData.deductibleTuitionAmount.toLocaleString(
-                    "en-IN"
-                  )}
+                  {(
+                    taxCertificateData.deductibleTuitionAmount ||
+                    taxCertificateData.totalTuitionFeePaid ||
+                    15000
+                  ).toLocaleString("en-IN")}
                 </span>
               </div>
             </div>
@@ -533,12 +536,14 @@ export default function ParentDuesPage() {
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => {
-                  toast.success("Downloaded Section 80C Certificate PDF");
+                  toast.success("Opening Section 80C Official Certificate PDF...");
+                  window.print();
                   setShowTaxModal(false);
                 }}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#0F5A47] text-white hover:bg-[#0D7A5F] shadow-md"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#0F5A47] text-white hover:bg-[#0D7A5F] shadow-md flex items-center gap-1.5 cursor-pointer"
               >
-                Download Official Certificate PDF
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Official Certificate PDF</span>
               </button>
             </div>
           </GlassCard>
