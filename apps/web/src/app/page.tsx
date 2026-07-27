@@ -376,11 +376,11 @@ function Hero() {
               <div className="flex flex-wrap gap-2">
                 <span className="px-3 py-1.5 rounded-xl bg-[#0F5A47]/10 text-[#0F5A47] border border-[#0F5A47]/20 text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
                   <Zap className="w-3.5 h-3.5 text-[#059669]" />
-                  Zero Manual Tally Entry
+                  Bank Statement Auto-Match 🤖
                 </span>
                 <span className="px-3 py-1.5 rounded-xl bg-white border border-[#0F5A47]/20 text-[#0F172A] text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
                   <Shield className="w-3.5 h-3.5 text-[#0F5A47]" />
-                  Audit-Backed Waivers
+                  1-Click Batch Clearance
                 </span>
               </div>
 

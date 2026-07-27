@@ -380,36 +380,59 @@ export default function AdminLedgerPage() {
                 />
 
                 {/* Filter & Search Toolbar */}
-                <GlassCard className="flex flex-wrap gap-4 items-end justify-between p-4 border-[#0F5A47]/15">
-                  <div className="flex flex-wrap gap-3 items-end flex-1">
-                    {/* Live Search Bar */}
-                    <div className="flex-1 min-w-[220px]">
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">Search Ledger</label>
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-text-secondary" />
-                        <input
-                          type="text"
-                          value={search}
-                          onChange={(e) => {
-                            setCursor(undefined);
-                            setSearch(e.target.value);
-                          }}
-                          placeholder="Student name, admission #, or UTR/Ref..."
-                          className="w-full bg-white border border-border-glass rounded-xl pl-9 pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
-                        />
-                      </div>
+                <GlassCard className="p-4 border-[#0F5A47]/15 space-y-3">
+                  {/* Row 1: Search Bar + Action Buttons */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex-1 relative max-w-lg">
+                      <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-text-secondary" />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => {
+                          setCursor(undefined);
+                          setSearch(e.target.value);
+                        }}
+                        placeholder="Student name, admission #, or UTR/Ref..."
+                        className="w-full bg-white border border-border-glass rounded-xl pl-10 pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47] shadow-xs"
+                      />
                     </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleExportCsv}
+                        className="px-3.5 py-2 bg-white border border-[#0F5A47]/30 text-[#0F5A47] text-xs font-bold rounded-xl shadow-xs hover:bg-[#0F5A47]/5 transition-all flex items-center gap-1.5"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Export CSV</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            playTactileSound("export");
+                            const res = await exportTallyXmlReport(schoolId, startDate, endDate);
+                            window.open(res.url, "_blank");
+                            toast.success(`Exported ${res.count} Tally XML Vouchers`);
+                          } catch (err: any) {
+                            toast.error(err.message || "Tally export failed");
+                          }
+                        }}
+                        className="px-3.5 py-2 bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-bold rounded-xl shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5"
+                      >
+                        <span>📊 Export Tally XML</span>
+                      </button>
+                    </div>
+                  </div>
 
-                    {/* Status Filter */}
+                  {/* Row 2: Equal Grid of Filter Controls */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2.5 border-t border-black/5">
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">Status Filter</label>
+                      <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">Status</label>
                       <select
                         value={statusFilter}
                         onChange={(e) => {
                           setCursor(undefined);
                           setStatusFilter(e.target.value as any);
                         }}
-                        className="bg-white border border-border-glass rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                        className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
                       >
                         <option value="all">ALL STATUSES</option>
                         <option value="posted">POSTED</option>
@@ -419,16 +442,15 @@ export default function AdminLedgerPage() {
                       </select>
                     </div>
 
-                    {/* Channel Filter */}
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">Mode</label>
+                      <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">Mode</label>
                       <select
                         value={channel}
                         onChange={(e) => {
                           setCursor(undefined);
                           setChannel(e.target.value as typeof channel);
                         }}
-                        className="bg-white border border-border-glass rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                        className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
                       >
                         {CHANNELS.map((c) => (
                           <option key={c} value={c}>
@@ -438,9 +460,8 @@ export default function AdminLedgerPage() {
                       </select>
                     </div>
 
-                    {/* Dates */}
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">From</label>
+                      <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">From Date</label>
                       <input
                         type="date"
                         value={startDate}
@@ -448,11 +469,12 @@ export default function AdminLedgerPage() {
                           setCursor(undefined);
                           setStartDate(e.target.value);
                         }}
-                        className="bg-white border border-border-glass rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                        className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">To</label>
+                      <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">To Date</label>
                       <input
                         type="date"
                         value={endDate}
@@ -460,35 +482,9 @@ export default function AdminLedgerPage() {
                           setCursor(undefined);
                           setEndDate(e.target.value);
                         }}
-                        className="bg-white border border-border-glass rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                        className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
                       />
                     </div>
-                  </div>
-
-                  {/* Exports */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleExportCsv}
-                      className="px-3.5 py-2 bg-white border border-[#0F5A47]/30 text-[#0F5A47] text-xs font-bold rounded-xl shadow-xs hover:bg-[#0F5A47]/5 transition-all flex items-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Export CSV</span>
-                    </button>
-                    <button
-                      onClick={async () => {
-                        try {
-                          playTactileSound("export");
-                          const res = await exportTallyXmlReport(schoolId, startDate, endDate);
-                          window.open(res.url, "_blank");
-                          toast.success(`Exported ${res.count} Tally XML Vouchers`);
-                        } catch (err: any) {
-                          toast.error(err.message || "Tally export failed");
-                        }
-                      }}
-                      className="px-3.5 py-2 bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-bold rounded-xl shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5"
-                    >
-                      <span>📊 Export Tally XML</span>
-                    </button>
                   </div>
                 </GlassCard>
 
