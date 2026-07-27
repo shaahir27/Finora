@@ -305,9 +305,9 @@ export default function AdminLedgerPage() {
   const selectedIdsCount = Object.values(selectedTxIds).filter(Boolean).length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 font-sans">
+    <div className="p-6 max-w-7xl mx-auto space-y-4 font-sans">
       {/* Workspace Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text-primary tracking-tight">Finance Operations</h1>
           <p className="text-text-secondary text-sm">Master ledger journal, bank auto-reconciliation, OCR scanner & offline sync.</p>
@@ -319,7 +319,7 @@ export default function AdminLedgerPage() {
       <div className="flex bg-white/70 p-1.5 rounded-2xl border border-border-glass max-w-3xl shadow-sm overflow-x-auto">
         <button
           onClick={() => setActiveTab("ledger")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
             activeTab === "ledger"
               ? "bg-[#0F5A47] text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-black/5"
@@ -330,7 +330,7 @@ export default function AdminLedgerPage() {
         </button>
         <button
           onClick={() => setActiveTab("bank_reconcile")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
             activeTab === "bank_reconcile"
               ? "bg-[#0F5A47] text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-black/5"
@@ -341,7 +341,7 @@ export default function AdminLedgerPage() {
         </button>
         <button
           onClick={() => setActiveTab("ocr")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
             activeTab === "ocr"
               ? "bg-[#0F5A47] text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-black/5"
@@ -352,7 +352,7 @@ export default function AdminLedgerPage() {
         </button>
         <button
           onClick={() => setActiveTab("offline")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
             activeTab === "offline"
               ? "bg-[#0F5A47] text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-black/5"
@@ -365,10 +365,10 @@ export default function AdminLedgerPage() {
 
       {/* TAB 1: MASTER LEDGER */}
       {activeTab === "ledger" && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <FiveStateRenderer state={state}>
             {(data) => (
-              <>
+              <div className="space-y-6">
                 {/* Executive KPI Banner */}
                 <LedgerKpiHeader
                   totalCollected={data.totalCollected || 0}
@@ -380,7 +380,7 @@ export default function AdminLedgerPage() {
                 />
 
                 {/* Filter & Search Toolbar */}
-                <GlassCard className="p-4 border-[#0F5A47]/15 space-y-3">
+                <GlassCard className="p-3.5 border-[#0F5A47]/15 space-y-2.5">
                   {/* Row 1: Search Bar + Action Buttons */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex-1 relative max-w-lg">
@@ -652,7 +652,7 @@ export default function AdminLedgerPage() {
                     </tbody>
                   </table>
                 </GlassCard>
-              </>
+              </div>
             )}
           </FiveStateRenderer>
         </div>
