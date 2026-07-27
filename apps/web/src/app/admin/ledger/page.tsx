@@ -275,7 +275,10 @@ export default function AdminLedgerPage() {
             entry.amount,
             entry.queued_at,
             res.conflictReason ?? "unknown_error"
-          ).catch(console.error);
+          ).catch((err) => {
+            toast.error("Reported conflict locally, but failed to notify server admins.");
+            console.error(err);
+          });
         }
       }
       await loadLocalQueue();

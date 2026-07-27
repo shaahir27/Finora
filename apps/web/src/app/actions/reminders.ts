@@ -25,6 +25,8 @@ export interface ReminderQueueItem {
   feeAssignmentId: string;
   studentName: string;
   studentId: string;
+  studentClass: string;
+  guardianPhone: string | null;
   feeTypeName: string;
   remainingBalance: number;
   dueDate: string;
@@ -63,7 +65,22 @@ export async function getRemindersQueue(
     include: {
       feeAssignment: {
         include: {
-          student: { select: { id: true, name: true } },
+          student: {
+            select: {
+              id: true,
+              name: true,
+              class: true,
+              guardianOf: {
+                include: {
+                  parentLink: {
+                    include: {
+                      user: { select: { phone: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
           feeType: { select: { name: true } },
           transactions: { select: { amount: true, reconciliationStatus: true } },
           waivers: { select: { amount: true } },
@@ -89,11 +106,15 @@ export async function getRemindersQueue(
     );
     const isStale = remainingBalance <= 0;
 
+    const guardianPhone = fa.student.guardianOf[0]?.parentLink?.user?.phone || null;
+
     return {
       id: log.id,
       feeAssignmentId: fa.id,
       studentName: fa.student.name,
       studentId: fa.student.id,
+      studentClass: fa.student.class || "Grade 10",
+      guardianPhone,
       feeTypeName: fa.feeType.name,
       remainingBalance,
       dueDate: fa.dueDate.toISOString().split("T")[0]!,

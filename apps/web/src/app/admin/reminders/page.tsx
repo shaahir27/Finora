@@ -239,20 +239,29 @@ export default function RemindersQueuePage() {
                     >
                       {isExpanded ? "Hide" : "Preview"}
                     </button>
-                    <a
-                      href={buildWhatsAppPaymentUrl({
-                        phone: "+919876543210",
-                        studentName: r.studentName,
-                        studentClass: "Student",
-                        amountRupees: r.remainingBalance,
-                        feeAssignmentId: r.feeAssignmentId,
-                      })}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs px-3 py-1.5 rounded-lg font-bold transition-all hover:bg-emerald-600 bg-emerald-700 text-white inline-flex items-center gap-1"
-                    >
-                      <span>💬 WhatsApp</span>
-                    </a>
+                    {r.guardianPhone ? (
+                      <a
+                        href={buildWhatsAppPaymentUrl({
+                          phone: r.guardianPhone,
+                          studentName: r.studentName,
+                          studentClass: r.studentClass || "Student",
+                          amountRupees: r.remainingBalance,
+                          feeAssignmentId: r.feeAssignmentId,
+                        })}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-3 py-1.5 rounded-lg font-bold transition-all hover:bg-emerald-600 bg-emerald-700 text-white inline-flex items-center gap-1"
+                      >
+                        <span>💬 WhatsApp</span>
+                      </a>
+                    ) : (
+                      <span
+                        className="text-[10px] px-2 py-1 rounded bg-black/10 text-text-secondary font-semibold border border-white/10"
+                        title="No parent phone number linked"
+                      >
+                        No Phone
+                      </span>
+                    )}
                     {!isSent && (
                       <button
                         id={`reminder-mark-sent-${r.id}`}
