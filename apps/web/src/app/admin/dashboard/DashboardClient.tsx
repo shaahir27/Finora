@@ -22,10 +22,6 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const router = useRouter();
 
-  const [aiQuery, setAiQuery] = useState("");
-  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-
   // Reports Drawer State
   const [isReportsDrawerOpen, setIsReportsDrawerOpen] = useState(false);
   const [reportStartDate, setReportStartDate] = useState(
@@ -34,21 +30,6 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
   const [reportEndDate, setReportEndDate] = useState(new Date().toISOString().split("T")[0]!);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportResult, setReportResult] = useState<{ url: string; count: number } | null>(null);
-
-  const handleAiSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiQuery.trim() || aiLoading) return;
-    setAiLoading(true);
-    setAiAnswer(null);
-    try {
-      const answer = await answerDashboardQueryAction(schoolId, aiQuery);
-      setAiAnswer(answer);
-    } catch {
-      toast.error("Failed to answer query.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   const handleGenerateReport = async (format: "csv" | "pdf" | "tally") => {
     try {
@@ -181,32 +162,6 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
           <QuickActionButton label="Quick Export" onClick={handleExport} />
         </div>
       </div>
-
-      {/* AI Query Bar */}
-      <GlassCard className="p-4 border-[#0F5A47]/20">
-        <form onSubmit={handleAiSearch} className="flex flex-col sm:flex-row gap-2.5">
-          <input
-            type="text"
-            placeholder="✨ Ask AI financial questions (e.g., 'What channel collected the most this month?')"
-            value={aiQuery}
-            onChange={(e) => setAiQuery(e.target.value)}
-            className="flex-1 px-4 py-2.5 bg-white/90 border border-border-glass rounded-xl text-text-primary focus:outline-none focus:border-[#0F5A47] text-base sm:text-sm shadow-xs min-h-[44px]"
-          />
-          <button
-            type="submit"
-            disabled={aiLoading}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white font-bold text-xs shadow-md hover:opacity-95 disabled:opacity-50 transition-all min-h-[44px] w-full sm:w-auto"
-          >
-            {aiLoading ? "Thinking…" : "Ask AI"}
-          </button>
-        </form>
-        {aiAnswer && (
-          <div className="mt-3 p-3 bg-[#0F5A47]/10 border border-[#0F5A47]/30 rounded-xl text-xs sm:text-sm text-text-primary leading-relaxed">
-            <span className="font-bold text-[#0F5A47]">AI Assistant: </span>
-            {aiAnswer}
-          </div>
-        )}
-      </GlassCard>
 
       {/* Main Metrics & Data */}
       <FiveStateRenderer state={state}>

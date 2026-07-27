@@ -49,10 +49,20 @@ export default function AdminLedgerPage() {
   // Ledger Filter State
   const [channel, setChannel] = useState<typeof CHANNELS[number]>("all");
   const [statusFilter, setStatusFilter] = useState<typeof STATUSES[number]>("all");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [cursor, setCursor] = useState<string | undefined>(undefined);
+
+  // Debounce search input by 300ms to prevent focus loss & flickering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCursor(undefined);
+      setSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   // Selection & Batch Action States
   const [selectedTxIds, setSelectedTxIds] = useState<Record<string, boolean>>({});
@@ -368,7 +378,113 @@ export default function AdminLedgerPage() {
 
       {/* TAB 1: MASTER LEDGER */}
       {activeTab === "ledger" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Filter & Search Toolbar (Persistent - Never unmounts on load) */}
+          <GlassCard className="p-3.5 border-[#0F5A47]/15 space-y-2.5">
+            {/* Row 1: Search Bar + Action Buttons */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex-1 relative max-w-lg">
+                <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-text-secondary" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Student name, admission #, or UTR/Ref..."
+                  className="w-full bg-white border border-border-glass rounded-xl pl-10 pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47] shadow-xs"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportCsv}
+                  className="px-3.5 py-2 bg-white border border-[#0F5A47]/30 text-[#0F5A47] text-xs font-bold rounded-xl shadow-xs hover:bg-[#0F5A47]/5 transition-all flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export CSV</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      playTactileSound("export");
+                      const res = await exportTallyXmlReport(schoolId, startDate, endDate);
+                      window.open(res.url, "_blank");
+                      toast.success(`Exported ${res.count} Tally XML Vouchers`);
+                    } catch (err: any) {
+                      toast.error(err.message || "Tally export failed");
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-bold rounded-xl shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5"
+                >
+                  <span>📊 Export Tally XML</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2: Equal Grid of Filter Controls */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2.5 border-t border-black/5">
+              <div>
+                <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setCursor(undefined);
+                    setStatusFilter(e.target.value as any);
+                  }}
+                  className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                >
+                  <option value="all">ALL STATUSES</option>
+                  <option value="posted">POSTED</option>
+                  <option value="cheque_pending">CHEQUE PENDING</option>
+                  <option value="flagged">FLAGGED ANOMALY</option>
+                  <option value="reversed">REVERSED</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">Mode</label>
+                <select
+                  value={channel}
+                  onChange={(e) => {
+                    setCursor(undefined);
+                    setChannel(e.target.value as typeof channel);
+                  }}
+                  className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                >
+                  {CHANNELS.map((c) => (
+                    <option key={c} value={c}>
+                      {c.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">From Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setCursor(undefined);
+                    setStartDate(e.target.value);
+                  }}
+                  className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">To Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setCursor(undefined);
+                    setEndDate(e.target.value);
+                  }}
+                  className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
+                />
+              </div>
+            </div>
+          </GlassCard>
+
           <FiveStateRenderer state={state}>
             {(data) => (
               <div className="space-y-6">
@@ -381,115 +497,6 @@ export default function AdminLedgerPage() {
                   flaggedCount={data.flaggedCount || 0}
                   revenueByChannel={data.revenueByChannel || []}
                 />
-
-                {/* Filter & Search Toolbar */}
-                <GlassCard className="p-3.5 border-[#0F5A47]/15 space-y-2.5">
-                  {/* Row 1: Search Bar + Action Buttons */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex-1 relative max-w-lg">
-                      <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-text-secondary" />
-                      <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => {
-                          setCursor(undefined);
-                          setSearch(e.target.value);
-                        }}
-                        placeholder="Student name, admission #, or UTR/Ref..."
-                        className="w-full bg-white border border-border-glass rounded-xl pl-10 pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47] shadow-xs"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleExportCsv}
-                        className="px-3.5 py-2 bg-white border border-[#0F5A47]/30 text-[#0F5A47] text-xs font-bold rounded-xl shadow-xs hover:bg-[#0F5A47]/5 transition-all flex items-center gap-1.5"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Export CSV</span>
-                      </button>
-                      <button
-                        onClick={async () => {
-                          try {
-                            playTactileSound("export");
-                            const res = await exportTallyXmlReport(schoolId, startDate, endDate);
-                            window.open(res.url, "_blank");
-                            toast.success(`Exported ${res.count} Tally XML Vouchers`);
-                          } catch (err: any) {
-                            toast.error(err.message || "Tally export failed");
-                          }
-                        }}
-                        className="px-3.5 py-2 bg-gradient-to-r from-[#0F5A47] to-[#0D7A5F] text-white text-xs font-bold rounded-xl shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5"
-                      >
-                        <span>📊 Export Tally XML</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Row 2: Equal Grid of Filter Controls */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2.5 border-t border-black/5">
-                    <div>
-                      <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">Status</label>
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => {
-                          setCursor(undefined);
-                          setStatusFilter(e.target.value as any);
-                        }}
-                        className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
-                      >
-                        <option value="all">ALL STATUSES</option>
-                        <option value="posted">POSTED</option>
-                        <option value="cheque_pending">CHEQUE PENDING</option>
-                        <option value="flagged">FLAGGED ANOMALY</option>
-                        <option value="reversed">REVERSED</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">Mode</label>
-                      <select
-                        value={channel}
-                        onChange={(e) => {
-                          setCursor(undefined);
-                          setChannel(e.target.value as typeof channel);
-                        }}
-                        className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
-                      >
-                        {CHANNELS.map((c) => (
-                          <option key={c} value={c}>
-                            {c.toUpperCase()}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">From Date</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => {
-                          setCursor(undefined);
-                          setStartDate(e.target.value);
-                        }}
-                        className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-extrabold text-text-secondary mb-1 uppercase tracking-wider">To Date</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => {
-                          setCursor(undefined);
-                          setEndDate(e.target.value);
-                        }}
-                        className="w-full bg-white border border-border-glass rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-[#0F5A47]"
-                      />
-                    </div>
-                  </div>
-                </GlassCard>
 
                 {/* Floating Batch Action Bar */}
                 {selectedIdsCount > 0 && (
