@@ -12,11 +12,16 @@
 |---|---|---|---|---|
 | **Multi-Fee Structure Assignment** | Supports Tuition, Transport, Sports, Laboratory, Admission, and Custom fee heads per class or student. | `apps/web/src/app/actions/fees.ts` | `FEE_TYPE`, `FEE_ASSIGNMENT` | Verified ✅ |
 | **Double-Entry Master Ledger** | Centralized transaction journal recording all payment events, adjustments, and reversals with chronological sequence numbers. | `apps/web/src/app/actions/ledger.ts` | `TRANSACTION`, `AUDIT_LOG` | Verified ✅ |
+| **Bank Statement Auto-Reconciliation Engine** | Parses raw bank statement text/CSV (ICICI, HDFC, SBI, Axis), extracts UTR/RRN numbers and amounts, and auto-matches lines against open student fee assignments via UTR rule matching & Gemini AI depositor narration matching. Interactive 3-column match board (Auto-Matched 🟢, Probable Candidates 🟡, Unlinked Suspense Queue 🔴) with 1-click batch posting. | `packages/ai/src/reconcileBankStatement.ts`, `apps/web/src/app/actions/bankReconciliation.ts`, `apps/web/src/components/BankReconciliationTab.tsx` | `TRANSACTION`, `FEE_ASSIGNMENT` | Verified ✅ |
+| **Real-Time Multi-Field Ledger Search Engine** | Instant debounced search matching Student Name, Admission Number, or UTR/Cheque/Ref Number, paired with status filter tabs (`posted`, `cheque_pending`, `flagged`, `reversed`). | `apps/web/src/app/actions/ledger.ts`, `apps/web/src/app/admin/ledger/page.tsx` | `TRANSACTION`, `STUDENT` | Verified ✅ |
+| **Multi-Select Batch Cheque Clearance** | Select multiple pending cheques with checkboxes and execute 1-click batch clearance in a single atomic Prisma transaction with audio soundbox confirmation. | `apps/web/src/app/actions/ledger.ts` | `TRANSACTION`, `AUDIT_LOG` | Verified ✅ |
+| **1-Click Formatted CSV/Excel Export Engine** | Generates downloadable CSV reports formatted with fee categories, GST calculations, and payment modes. | `apps/web/src/app/actions/ledger.ts` | `TRANSACTION` | Verified ✅ |
+| **Live Financial Control KPI Header & Audit Inspector Drawer** | Glassmorphic KPI header displaying Settled Revenue (with UPI/Cash/Cheque distribution bar), Pending Cheques Value, and Flagged Anomalies Count. Clicking any row opens a slide-over drawer showing itemized GST tax calculations and full chronological Audit Trail history. | `apps/web/src/components/LedgerKpiHeader.tsx`, `apps/web/src/components/TransactionInspectorDrawer.tsx` | `TRANSACTION`, `AUDIT_LOG` | Verified ✅ |
 | **Partial Payment Allocation** | Automatically applies partial payment amounts against remaining fee balances without off-by-one errors. | `packages/rules/src/feeComputation.ts` | `FEE_ASSIGNMENT`, `TRANSACTION` | Verified ✅ |
 | **Waiver & Penalty Audit Engine** | Allows admins to apply waivers or penalties with mandatory logged reasons and strict audit logging. | `apps/web/src/app/actions/ledger.ts` | `WAIVER`, `PENALTY`, `AUDIT_LOG` | Verified ✅ |
 | **Cheque Clearance & Bounce Workflow** | Real-time cheque status transitions (`cheque_pending` → `posted` or `reversed`), auto-reopening fee balances and recalculating defaulter risk on bounce. | `apps/web/src/app/actions/ledger.ts` | `TRANSACTION`, `DEFAULTER_SCORE` | Verified ✅ |
 | **Bulk CSV Student Import** | Partial-batch resilient CSV student directory import skipping existing admission numbers per school. | `apps/web/src/app/actions/students.ts` | `STUDENT` | Verified ✅ |
-| **Student Lifecycle Management** | Handles student status changes (`active`, `graduated`, `withdrawn`) with mandatory balance disposition rules (`write_off`, `refund`, `carry_forward`). | `apps/web/src/app/actions/students.ts` | `STUDENT`, `WAIVER` | Verified ✅ |
+| **Student Lifecycle Management** | Handles student status changes (`active`, `withdrawn`, `graduated`, `transferred`) with mandatory balance disposition rules (`write_off`, `carry_forward`). | `apps/web/src/app/actions/students.ts` | `STUDENT`, `WAIVER` | Verified ✅ |
 
 ---
 
@@ -25,7 +30,7 @@
 | Feature | Description | Primary Code Files | DB Schema Tables | Status |
 |---|---|---|---|---|
 | **Razorpay UPI Sandbox Integration** | Order creation and sandbox UPI simulation for parent payments. | `packages/payments/src/razorpay.ts` | `TRANSACTION` | Verified ✅ |
-| **Webhook HMAC Verification & Idempotency** | Razorpay HMAC signature validation ensuring duplicate `ref_number` webhooks return existing records. | `apps/web/src/app/actions/ledger.ts` | `TRANSACTION` | Verified ✅ |
+| **Webhook HMAC Verification & Idempotency** | Razorpay HMAC signature validation ensuring duplicate `ref_number` webhooks return existing records. | `packages/payments/src/razorpay.ts`, `apps/web/src/app/actions/ledger.ts` | `TRANSACTION` | Verified ✅ |
 | **Manual UPI Reconciliation Fallback** | Admin recovery action (`reconcileMissedUpiPayment`) querying Razorpay API for missed webhooks. | `apps/web/src/app/actions/ledger.ts` | `TRANSACTION` | Verified ✅ |
 | **Rule-Based Anomaly Detection** | Real-time amount mismatch and duplicate reference checking via `round2()` precision arithmetic. | `packages/rules/src/anomaly.ts` | `ANOMALY_FLAG` | Verified ✅ |
 | **School-Scoped Anomaly Resolution** | Admin action (`resolveAnomaly`) allowing posting or reversing flagged transactions within authorized school context. | `apps/web/src/app/actions/ledger.ts` | `ANOMALY_FLAG`, `TRANSACTION` | Verified ✅ |
@@ -48,27 +53,30 @@
 
 ## 4. Parent Portal, Multi-Child Cockpit & Localization
 
-| Feature | Description | Primary Code Files | DB Schema Tables | Status |
+| Feature | Description | Primary Code Files | DB Schema Tables / Files | Status |
 |---|---|---|---|---|
-| **Parent Phone OTP & Email Auth** | Supabase Auth integration with Twilio SMS OTP and email fallback for parent login. | `apps/web/src/app/actions/parents.ts` | `USER`, `PARENT_STUDENT_LINK` | Verified ✅ |
-| **Multi-Child Parent Cockpit** | Consolidated view aggregating total household dues across siblings with an instant student switcher. | `apps/web/src/app/parent/cockpit/page.tsx` | `PARENT_STUDENT_LINK`, `STUDENT` | Verified ✅ |
-| **Parent IDOR Protection** | Server Actions derive `parentUserId` directly from session context, verifying `guardianOf` ownership before returning data. | `apps/web/src/lib/require-session.ts` | `PARENT_STUDENT_LINK` | Verified ✅ |
-| **Bilingual Hindi / English Toggle** | `next-intl` localization enabling 1-click toggle between English and Hindi across parent portal surfaces. | `apps/web/src/components/LanguageSwitcher.tsx` | `messages/en.json`, `messages/hi.json` | Verified ✅ |
-| **Parent Payment Sandbox** | Interactive UPI payment simulator allowing parents to pay dues in sandbox mode with instant receipt generation. | `apps/web/src/app/parent/dues/page.tsx` | `TRANSACTION`, `RECEIPT` | Verified ✅ |
+| **Parent Phone OTP & Email Auth** | Supabase Auth integration with Twilio SMS OTP and email fallback for parent login. | `apps/web/src/app/actions/parents.ts` | `USER`, `PARENT_LINK`, `GUARDIAN_OF` | Verified ✅ |
+| **Multi-Child Parent Cockpit** | Consolidated view aggregating total household dues across siblings with an instant student switcher. | `apps/web/src/app/parent/cockpit/page.tsx` | `PARENT_LINK`, `GUARDIAN_OF`, `STUDENT` | Verified ✅ |
+| **Parent IDOR Protection** | Server Actions derive `parentUserId` directly from session context, verifying `guardianOf` ownership before returning data. | `apps/web/src/lib/require-session.ts` | `PARENT_LINK`, `GUARDIAN_OF` | Verified ✅ |
+| **8-Language Indic Localization (Multi-Language Toggle)** | Multi-language support (English, Hindi, Bengali, Marathi, Telugu, Tamil, Gujarati, Kannada) with client-side dropdown & instant locale switching. Powered by Gemini AI batch translation fallback for missing dynamic keys. | `apps/web/src/components/LanguageSwitcher.tsx`, `packages/ai/src/translateText.ts` | `apps/web/src/i18n/*.json` (en, hi, bn, mr, te, ta, gu, kn) | Verified ✅ |
+| **Parent Payment Sandbox** | Interactive UPI payment simulator allowing parents to pay dues in sandbox mode with instant receipt generation. | `apps/web/src/app/parent/dues/page.tsx`, `apps/web/src/app/parent/pay/page.tsx` | `TRANSACTION`, `RECEIPT` | Verified ✅ |
 
 ---
 
-## 5. 7 Gemini-Powered AI Features
+## 5. Gemini-Powered AI Suite (10 Core Modules)
 
 | Feature | Description | Primary Code Files | Dependencies | Status |
 |---|---|---|---|---|
-| **1. Defaulter Insight Narration** | Generates humanized risk summaries for high-risk student cards. | `packages/ai/src/narrative.ts` | Gemini API | Verified ✅ |
-| **2. Natural Language Dashboard Queries** | Converts English/Hindi questions into structured ledger queries. | `packages/ai/src/dashboardQuery.ts` | Gemini API | Verified ✅ |
-| **3. Anomaly Explanation Narration** | Explains why a transaction was flagged in plain language. | `packages/ai/src/narrative.ts` | Gemini API | Verified ✅ |
-| **4. AI Reminder Text Drafting** | Drafts polite, persuasive reminder messages tailored to risk tier. | `packages/ai/src/narrative.ts` | Gemini API | Verified ✅ |
-| **5. OCR Document Field Extraction** | Extracts fee amounts, student names, and dates from bank deposit slips and cheque images. | `packages/ai/src/ocr.ts` | Gemini Vision | Verified ✅ |
-| **6. AI Copilot (Function Calling)** | Role-based Copilot executing whitelisted read actions for Admin & Parent. | `packages/ai/src/copilot.ts` | Gemini API | Verified ✅ |
-| **7. Weekly Summary Digest** | Computes 7-day collection trends, cheque aging, and risk movements narrated into a weekly executive digest. | `packages/ai/src/weeklyDigest.ts` | Gemini API | Verified ✅ |
+| **1. Defaulter Insight Narration** | Generates humanized risk summaries for high-risk student cards. | `packages/ai/src/narrateDefaulterInsight.ts`, `apps/web/src/app/actions/ai.ts` | Gemini API | Verified ✅ |
+| **2. Natural Language Dashboard Queries** | Converts English/Hindi questions into structured ledger queries. | `packages/ai/src/answerDashboardQuery.ts`, `apps/web/src/app/actions/ai.ts` | Gemini API | Verified ✅ |
+| **3. Anomaly Explanation Narration** | Explains why a transaction was flagged in plain language. | `packages/ai/src/narrateAnomaly.ts`, `apps/web/src/app/actions/ai.ts` | Gemini API | Verified ✅ |
+| **4. AI Reminder Text Drafting** | Drafts polite, persuasive reminder messages tailored to risk tier. | `packages/ai/src/draftReminderText.ts`, `apps/web/src/app/actions/ai.ts` | Gemini API | Verified ✅ |
+| **5. OCR Document Field Extraction** | Extracts fee amounts, student names, and dates from bank deposit slips and cheque images. | `packages/ai/src/processOcrUpload.ts`, `apps/web/src/app/actions/ai.ts` | Gemini Vision | Verified ✅ |
+| **6. AI Copilot (Function Calling)** | Role-based Copilot executing whitelisted read actions for Admin & Parent. | `packages/ai/src/copilotQuery.ts`, `apps/web/src/app/actions/ai.ts` | Gemini API | Verified ✅ |
+| **7. Weekly Summary Digest** | Computes 7-day collection trends, cheque aging, and risk movements narrated into a weekly executive digest. | `packages/ai/src/generateWeeklyDigest.ts`, `apps/web/src/app/actions/ai.ts` | Gemini API | Verified ✅ |
+| **8. Retrieval-Grounded How-Do-I Tool** | Grounded Q&A over curated spec document excerpts for Admin & Parent Copilot guidance. | `packages/ai/src/answerHowDoI.ts` | Gemini API | Verified ✅ |
+| **9. Indic AI Translation Engine** | Translates dynamic UI text & missing keys into 8 Indian languages with single-phrase and high-efficiency batch translation. | `packages/ai/src/translateText.ts`, `apps/web/src/app/actions/ai.ts` | Gemini API | Verified ✅ |
+| **10. Bank Statement AI Auto-Matcher** | Parses raw bank statement lines (ICICI, HDFC, SBI, Axis), extracts UTR/RRN numbers, and matches depositor narrations against unpaid student fees. | `packages/ai/src/reconcileBankStatement.ts`, `apps/web/src/app/actions/bankReconciliation.ts` | Gemini API | Verified ✅ |
 
 ---
 
@@ -87,7 +95,8 @@
 
 | Feature | Description | Primary Code Files | Zero-Key Requirement | Status |
 |---|---|---|---|---|
-| **AI Audio Fee Soundbox** | Provides bilingual (Hindi/English) voice confirmation when payments post, triggered in: (1) Admin Finance Ops on cheque clearance and OCR confirmation, (2) Parent UPI Sandbox payment at `/parent/pay`, and (3) Parent combined family dues payment at `/parent/dues`. Uses W3C `SpeechSynthesis` — zero external API. | `apps/web/src/lib/soundbox.ts`, `SoundboxToggle.tsx`, `apps/web/src/app/parent/pay/page.tsx`, `apps/web/src/app/parent/dues/page.tsx` | 0 External API Keys | Verified ✅ |
+| **AI Audio Fee Soundbox** | Provides bilingual (Hindi/English) voice confirmation when payments post, triggered in: (1) Admin Finance Ops on cheque clearance and OCR confirmation, (2) Parent UPI Sandbox payment at `/parent/pay`, and (3) Parent combined family dues payment at `/parent/dues`. Uses W3C `SpeechSynthesis` — zero external API. | `apps/web/src/lib/soundbox.ts`, `apps/web/src/components/SoundboxToggle.tsx`, `apps/web/src/app/parent/pay/page.tsx`, `apps/web/src/app/parent/dues/page.tsx` | 0 External API Keys | Verified ✅ |
+| **Web Audio API Tactile Micro-Feedback** | Synthesizes crisp audio feedback cues (click, success chord, export chime) for interactive actions with zero external audio assets. | `apps/web/src/lib/playTactileSound.ts` | 0 External API Keys | Verified ✅ |
 | **WhatsApp 1-Tap UPI Payment Links** | Dispatches interactive WhatsApp links (`https://wa.me/...`) with pre-filled student details and 1-tap Google Pay/PhonePe checkout. | `apps/web/src/lib/whatsapp.ts` | 0 External API Keys | Verified ✅ |
 | **Smart Sibling WhatsApp Bundling** | Aggregates dues for parents with 2+ children into a single single-card WhatsApp payment link. | `apps/web/src/lib/whatsapp.ts` | 0 External API Keys | Verified ✅ |
 | **Dynamic Student UPI QR Code Generator** | Builds NPCI-compliant UPI URIs (`upi://pay?pa=...&tr=feeAssignmentId`) containing embedded transaction references for 100% auto-reconciliation. | `apps/web/src/lib/upiQr.ts` | 0 External API Keys | Verified ✅ |
@@ -109,3 +118,4 @@
 | **Landing Page Premium Animations** | Multi-layer animation stack: Framer Motion spring physics, Interactive HTML5 `AmbientParticlesCanvas` (emerald constellation particle mesh with node-linking), `canvas-confetti` celebratory bursts on soundbox triggers, 3D mouse-tilt `TiltSpotlightCard` with radial spotlight, animated `SoundEqualizer` waveform. | `apps/web/src/app/page.tsx` | Verified ✅ |
 | **Strict Type Checking** | Zero TypeScript compilation errors across all workspace packages (`pnpm --filter web exec tsc --noEmit`). | Entire Monorepo | Verified ✅ |
 | **Automated Test Suite** | 54 out of 54 Vitest unit and integration tests passing cleanly. | `pnpm test` | 100% Green ✅ |
+

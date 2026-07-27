@@ -754,6 +754,8 @@ export async function getLedgerSnapshot(
   schoolId: string,
   options?: {
     channel?: PaymentChannel;
+    status?: ReconciliationStatus;
+    search?: string;
     startDate?: Date;
     endDate?: Date;
     cursor?: string;
@@ -764,6 +766,16 @@ export async function getLedgerSnapshot(
 
   const where: any = { schoolId };
   if (options?.channel) where.channel = options.channel;
+  if (options?.status) where.reconciliationStatus = options.status;
+
+  if (options?.search && options.search.trim()) {
+    const term = options.search.trim();
+    where.OR = [
+      { student: { name: { contains: term, mode: "insensitive" } } },
+      { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
+      { refNumber: { contains: term, mode: "insensitive" } },
+    ];
+  }
   
   const validStart = options?.startDate && !isNaN(options.startDate.getTime()) ? options.startDate : undefined;
   const validEnd = options?.endDate && !isNaN(options.endDate.getTime()) ? options.endDate : undefined;
@@ -798,8 +810,26 @@ export async function getLedgerSnapshot(
     nextCursor = nextItem?.id;
   }
 
-  // Metrics calculations for dashboard
-  // 1. Outstanding Dues
+  // Metrics calculations for dashboard & KPI banner
+  const [pendingChequeAgg, flaggedAgg, reversedAgg] = await Promise.all([
+    prisma.transaction.aggregate({
+      where: { schoolId, reconciliationStatus: "cheque_pending" },
+      _sum: { amount: true },
+      _count: { id: true },
+    }),
+    prisma.transaction.aggregate({
+      where: { schoolId, reconciliationStatus: "flagged" },
+      _sum: { amount: true },
+      _count: { id: true },
+    }),
+    prisma.transaction.aggregate({
+      where: { schoolId, reconciliationStatus: "reversed" },
+      _sum: { amount: true },
+      _count: { id: true },
+    }),
+  ]);
+
+  // Outstanding Dues
   const assignments = await prisma.feeAssignment.findMany({
     where: { schoolId },
     include: {
@@ -818,7 +848,7 @@ export async function getLedgerSnapshot(
     }
   }
 
-  // 2. Reconciliation Stats
+  // Reconciliation Stats
   const allTx = await prisma.transaction.findMany({
     where: { schoolId },
     select: { reconciliationStatus: true }
@@ -829,7 +859,7 @@ export async function getLedgerSnapshot(
   const flaggedCount = allTx.filter(t => t.reconciliationStatus === "flagged").length;
   const matchPercentage = totalTx > 0 ? Math.round((postedTx / totalTx) * 100) : 100;
 
-  // 3. Revenue by channel (posted only)
+  // Revenue by channel (posted only)
   const channelData = await prisma.transaction.groupBy({
     by: ['channel'],
     where: { schoolId, reconciliationStatus: "posted" },
@@ -846,6 +876,12 @@ export async function getLedgerSnapshot(
     transactions: transactions.map(t => serializeTransaction(t)),
     nextCursor,
     totalCollected: _sum.amount?.toNumber() || 0,
+    pendingChequeTotal: pendingChequeAgg._sum.amount?.toNumber() || 0,
+    pendingChequeCount: pendingChequeAgg._count.id || 0,
+    flaggedTotal: flaggedAgg._sum.amount?.toNumber() || 0,
+    flaggedCount: flaggedAgg._count.id || 0,
+    reversedTotal: reversedAgg._sum.amount?.toNumber() || 0,
+    reversedCount: reversedAgg._count.id || 0,
     outstandingDuesTotal,
     reconciliationStats: {
       matchPercentage,
@@ -854,3 +890,187 @@ export async function getLedgerSnapshot(
     revenueByChannel
   };
 }
+
+/**
+ * Batch clears multiple pending cheques in a single atomic transaction.
+ */
+export async function batchClearChequesAction(
+  schoolId: string,
+  transactionIds: string[]
+): Promise<{ clearedCount: number; totalAmount: number }> {
+  const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
+
+  if (!transactionIds || transactionIds.length === 0) {
+    return { clearedCount: 0, totalAmount: 0 };
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const transactions = await tx.transaction.findMany({
+      where: {
+        id: { in: transactionIds },
+        schoolId,
+        reconciliationStatus: "cheque_pending",
+      },
+    });
+
+    let clearedCount = 0;
+    let totalAmount = 0;
+
+    for (const t of transactions) {
+      await tx.transaction.update({
+        where: { id: t.id },
+        data: { reconciliationStatus: "posted" },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: sessionAdminId,
+          action: "cheque_cleared",
+          beforeState: { transactionId: t.id, status: "cheque_pending" },
+          afterState: { status: "posted", batch: true },
+        },
+      });
+
+      clearedCount++;
+      totalAmount += t.amount.toNumber();
+    }
+
+    return { clearedCount, totalAmount };
+  });
+
+  if (result.clearedCount > 0) {
+    notifySchoolAdmins(schoolId, {
+      title: "Batch Cheques Cleared",
+      body: `Batch cleared ${result.clearedCount} cheques totaling ₹${result.totalAmount}.`,
+      url: "/admin/ledger",
+    }).catch(console.error);
+  }
+
+  return result;
+}
+
+/**
+ * Generates a formatted CSV file payload for ledger export.
+ */
+export async function exportLedgerCsvAction(
+  schoolId: string,
+  options?: {
+    channel?: PaymentChannel;
+    status?: ReconciliationStatus;
+    startDate?: Date;
+    endDate?: Date;
+  }
+): Promise<{ csvData: string; count: number; filename: string }> {
+  await requireAdminForSchool(schoolId);
+
+  const snapshot = await getLedgerSnapshot(schoolId, {
+    ...options,
+    limit: 1000,
+  });
+
+  const headers = [
+    "Transaction Date",
+    "Transaction ID",
+    "Reference / Cheque No",
+    "Student Name",
+    "Admission No",
+    "Fee Type",
+    "Category",
+    "Payment Mode",
+    "Amount (INR)",
+    "GST Amount (INR)",
+    "Reconciliation Status",
+  ];
+
+  const rows = snapshot.transactions.map((t: any) => {
+    const dateStr = new Date(t.postedAt).toISOString().split("T")[0]!;
+    const txId = t.id;
+    const ref = t.refNumber || "N/A";
+    const studentName = t.studentName || t.student?.name || "N/A";
+    const admissionNo = t.student?.admissionNumber || "N/A";
+    const feeType = t.feeAssignment?.feeType?.name || "Fee";
+    const category = t.feeAssignment?.feeType?.category || "General";
+    const channel = t.channel?.toUpperCase() || "N/A";
+    const amount = Number(t.amount).toFixed(2);
+    
+    // Estimate GST from fee type if taxable
+    let gstAmount = "0.00";
+    if (t.feeAssignment?.feeType?.gstTreatment === "taxable" && t.feeAssignment?.feeType?.gstRate) {
+      const rate = Number(t.feeAssignment.feeType.gstRate);
+      const am = Number(t.amount);
+      const gst = am * (rate / (100 + rate));
+      gstAmount = gst.toFixed(2);
+    }
+
+    const status = t.reconciliationStatus;
+
+    return [
+      dateStr,
+      txId,
+      `"${ref}"`,
+      `"${studentName}"`,
+      `"${admissionNo}"`,
+      `"${feeType}"`,
+      `"${category}"`,
+      channel,
+      amount,
+      gstAmount,
+      status,
+    ].join(",");
+  });
+
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const filename = `Finora_Ledger_Export_${new Date().toISOString().split("T")[0]}.csv`;
+
+  return {
+    csvData: csvContent,
+    count: snapshot.transactions.length,
+    filename,
+  };
+}
+
+/**
+ * Returns full transaction audit logs and GST breakdown for the Inspector drawer.
+ */
+export async function getTransactionAuditHistory(transactionId: string) {
+  const transaction = await prisma.transaction.findUnique({
+    where: { id: transactionId },
+    include: {
+      student: { select: { id: true, name: true, admissionNumber: true, class: true } },
+      feeAssignment: { include: { feeType: true, school: true } },
+      penalties: true,
+      anomalyFlag: true,
+      receipt: true,
+    },
+  });
+
+  if (!transaction) throw new Error("Transaction not found");
+
+  await requireAdminForSchool(transaction.schoolId);
+
+  // Fetch relevant audit logs
+  const auditLogs = await prisma.auditLog.findMany({
+    where: {
+      OR: [
+        { beforeState: { path: ["transactionId"], equals: transactionId } },
+        { afterState: { path: ["transactionId"], equals: transactionId } },
+      ],
+    },
+    orderBy: { createdAt: "asc" },
+    include: { actor: { select: { email: true, role: true } } },
+  });
+
+  return {
+    transaction: serializeTransaction(transaction),
+    auditLogs: auditLogs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      actorEmail: log.actor.email || "System Admin",
+      actorRole: log.actor.role,
+      beforeState: log.beforeState,
+      afterState: log.afterState,
+      createdAt: log.createdAt.toISOString(),
+    })),
+  };
+}
+

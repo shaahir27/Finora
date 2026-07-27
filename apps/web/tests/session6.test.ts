@@ -7,8 +7,14 @@ import { generateReconciliationReport } from "@/app/actions/reports";
 import { markReminderSent } from "@/app/actions/reminders";
 
 // ---------------------------------------------------------------------------
-// DB mock — no real DB for unit tests
+// DB & Session mocks
 // ---------------------------------------------------------------------------
+vi.mock("@/lib/require-session", () => ({
+  requireAdminForSchool: vi.fn().mockResolvedValue({ adminId: "admin-1", schoolId: "school-1" }),
+  requireAdminSession: vi.fn().mockResolvedValue({ user: { id: "admin-1" } }),
+  requireParentSession: vi.fn().mockResolvedValue({ user: { id: "parent-1" } }),
+}));
+
 vi.mock("@smart-school/db", () => ({
   prisma: {
     $transaction: vi.fn((cb) => cb(prismaMock)),

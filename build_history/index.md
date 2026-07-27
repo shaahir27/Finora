@@ -7,7 +7,7 @@ Map of every feature built, where its log lives, and its current status. Updated
 | Project Scaffolding | Session 1 | `session_01_ledger_core/feature_project_scaffolding.md` | Built | 2026-07-15 |
 | Student Directory | Session 1 | `session_01_ledger_core/feature_student_directory.md` | Updated | 2026-07-20 |
 | Fee Engine | Session 1 | `session_01_ledger_core/feature_fee_engine.md` | Built | 2026-07-15 |
-| Ledger Engine | Session 1 | `session_01_ledger_core/feature_ledger_engine.md` | Updated | 2026-07-24 |
+| Ledger Engine | Session 1 | `session_01_ledger_core/feature_ledger_engine.md` | Updated | 2026-07-27 |
 | Rule Engine | Session 1 | `session_01_ledger_core/feature_rule_engine.md` | Built | 2026-07-15 |
 | Razorpay Integration | Session 2 | `session_02_reconciliation/feature_razorpay_integration.md` | Updated | 2026-07-24 |
 | Reconciliation State Machine | Session 2 | `session_02_reconciliation/feature_reconciliation_state_machine.md` | Built | 2026-07-15 |

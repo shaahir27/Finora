@@ -50,3 +50,16 @@ export {
   translateTextWithGemini,
   translateBatchWithGemini,
 } from "./translateText";
+
+// AI Feature 9 — Bank Statement Auto-Reconciliation Engine
+export {
+  reconcileBankStatement,
+  parseBankStatementText,
+} from "./reconcileBankStatement";
+export type {
+  BankLineItem,
+  StudentFeeContext,
+  MatchedBankItem,
+  BankReconciliationResult,
+} from "./reconcileBankStatement";
+

@@ -52,12 +52,18 @@ status: "Built"
     data: { amount: number; reason: string; }
   )
   ```
-  * `getLedgerSnapshot` (`apps/web/src/app/actions/ledger.ts`): Aggregates total collected revenue (excluding `flagged` transactions) and pending fees across the school.
+  * `getLedgerSnapshot` (`apps/web/src/app/actions/ledger.ts`): Aggregates total collected revenue, pending cheque totals, flagged anomaly totals, reversed totals, and supports real-time multi-field search (`student.name`, `student.admissionNumber`, `refNumber`) and status filtering (`posted`, `cheque_pending`, `flagged`, `reversed`).
   ```typescript
   export async function getLedgerSnapshot(
-    schoolId: string, options?: { channel?: PaymentChannel; startDate?: Date; endDate?: Date; cursor?: string; limit?: number; }
+    schoolId: string, options?: { channel?: PaymentChannel; status?: ReconciliationStatus; search?: string; startDate?: Date; endDate?: Date; cursor?: string; limit?: number; }
   )
   ```
+  * `batchClearChequesAction` (`apps/web/src/app/actions/ledger.ts`): Executes atomic batch clearing of selected pending cheques in a single Prisma transaction with audit logs and audio soundbox notifications.
+  * `exportLedgerCsvAction` (`apps/web/src/app/actions/ledger.ts`): Generates a downloadable CSV spreadsheet formatted with fee categories, GST calculations, and payment details.
+  * `getTransactionAuditHistory` (`apps/web/src/app/actions/ledger.ts`): Returns complete audit trail history and itemized GST tax breakdown for the Transaction Inspector drawer.
+  * `reconcileBankStatement` (`packages/ai/src/reconcileBankStatement.ts`): Bank Statement Auto-Reconciliation Engine using UTR rule matching & Gemini AI semantic depositor matching.
+  * `processBankStatementAction` (`apps/web/src/app/actions/bankReconciliation.ts`): Server action executing bank statement auto-reconciliation against school fee contexts.
+  * `confirmBatchBankReconciliationAction` (`apps/web/src/app/actions/bankReconciliation.ts`): Batch posts confirmed bank statement matches to the master ledger.
   * `markChequeCleared` (`apps/web/src/app/actions/ledger.ts`): Safely advances a cheque's reconciliation status to posted with session-derived audit log. Guarded by `requireAdminForSchool`.
   ```typescript
   export async function markChequeCleared(transactionId: string): Promise<Transaction>
@@ -71,11 +77,13 @@ status: "Built"
 
 ## 5. Testing & Verification
 * **Automated tests:**
-  * `apps/web/src/__tests__/waiverPenaltyAudit.test.ts` — directly tests `applyWaiver` and `applyPenalty`: verifies `AUDIT_LOG` rows are produced on every call, empty/null reasons are rejected at the application layer, and empty `adminId` is rejected.
+  * `packages/ai/src/__tests__/reconcileBankStatement.test.ts` — tests bank statement text parsing, exact UTR rule matching, and fallback handling.
+  * `apps/web/src/__tests__/waiverPenaltyAudit.test.ts` — tests `applyWaiver` and `applyPenalty` audit logging and validations.
   * `apps/web/src/__tests__/reconciliation.test.ts` — tests `recordPayment`, `markChequeBounced`, `markChequeCleared`, and `resolveSyncConflict`.
-* **Manually verified:** DB-level lock testing for concurrency, security check that waivers and penalties enforce `adminId` and emit `AUDIT_LOG`.
+* **Manually verified:** DB-level lock testing for concurrency, 4-tab workspace navigation (`Master Ledger`, `Bank Auto-Match 🤖`, `OCR Scanner`, `Offline Sync`), multi-select batch cheque clearing, CSV export, and Transaction Inspector drawer.
 
 ## 6. Dependencies & Deferred Work
-* **Depends on:** `detectAnomaly` and `computeDefaulterScore` from `packages/rules`.
-* **Updates applied in Audit Pass**: `resolveAnomaly` action updated with real school scoping, `recordPayment` refactored into `recordPaymentInternal`, `markChequeCleared` updated to single-argument signature with audit logging, and `P2002` duplicate handling added for transaction ref numbers.
+* **Depends on:** `detectAnomaly` and `computeDefaulterScore` from `packages/rules`, `generateContent` from `@smart-school/ai`.
+* **Option C Upgrade Applied**: Real-time multi-field search engine, status filters, 1-click batch cheque clearance, formatted CSV export engine, live KPI banner, Transaction Inspector drawer, and the flagship Bank Statement Auto-Reconciliation Engine with 3-column match board.
+
 
