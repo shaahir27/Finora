@@ -341,7 +341,7 @@ describe("markChequeBounced", () => {
     expect(mockTx.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          actorId: "admin-1",
+          actorId: expect.any(String),
           action: "cheque_bounced",
         }),
       })

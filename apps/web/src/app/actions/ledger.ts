@@ -355,7 +355,7 @@ export async function applyPenalty(
       const authResult = await requireAdminForSchool(targetSchoolId);
       sessionAdminId = authResult.adminId;
     }
-    const effectiveAdminId = adminId || sessionAdminId;
+    const effectiveAdminId = sessionAdminId;
 
     const penalty = await tx.penalty.create({
       data: {
@@ -367,7 +367,7 @@ export async function applyPenalty(
 
     await tx.auditLog.create({
       data: {
-        actorId: effectiveAdminId,
+        actorId: sessionAdminId,
         action: "penalty_applied",
         beforeState: { transactionId },
         afterState: {
@@ -445,7 +445,7 @@ export async function markChequeBounced(
     }
 
     const { adminId: sessionAdminId } = await requireAdminForSchool(transaction.schoolId);
-    const effectiveAdminId = adminId || sessionAdminId;
+    const effectiveAdminId = sessionAdminId;
 
     const updated = await tx.transaction.update({
       where: { id: transactionId },
@@ -454,7 +454,7 @@ export async function markChequeBounced(
 
     await tx.auditLog.create({
       data: {
-        actorId: effectiveAdminId,
+        actorId: sessionAdminId,
         action: "cheque_bounced",
         beforeState: {
           transactionId,
@@ -567,7 +567,7 @@ export async function applyWaiver(
   }
 
   const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
-  const effectiveAdminId = adminId || sessionAdminId;
+  const effectiveAdminId = sessionAdminId;
 
   const result = await prisma.$transaction(async (tx) => {
     const assignment = await tx.feeAssignment.findUnique({
@@ -599,7 +599,7 @@ export async function applyWaiver(
         feeAssignmentId,
         amount: data.amount,
         reason: data.reason,
-        approvedById: effectiveAdminId,
+        approvedById: sessionAdminId,
       },
     });
 
@@ -607,7 +607,7 @@ export async function applyWaiver(
 
     await tx.auditLog.create({
       data: {
-        actorId: effectiveAdminId,
+        actorId: sessionAdminId,
         action: "waiver_applied",
         beforeState: { effectiveBalance: remainingBalance },
         afterState: {

@@ -110,7 +110,7 @@ export async function getRemindersQueue(
     );
     const isStale = remainingBalance <= 0;
 
-    const guardianPhone = fa.student.guardianOf[0]?.parentLink?.user?.phone || null;
+    const guardianPhone = fa.student.guardianOf.find((g) => g.parentLink?.user?.phone)?.parentLink?.user?.phone || null;
 
     return {
       id: log.id,

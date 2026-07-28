@@ -7,22 +7,28 @@
  */
 
 export interface DynamicUpiParams {
-  schoolVpa?: string;       // e.g. schoolname@icici (defaults to demo VPA)
+  schoolVpa: string;        // e.g. schoolname@icici (required — no silent default VPA fallback)
   schoolName?: string;      // e.g. Demo International School
   feeAssignmentId: string;  // Idempotency & auto-reconciliation anchor
   amountRupees: number;     // e.g. 5000
   note?: string;            // e.g. Term 1 Tuition Fee
 }
 
-const DEFAULT_VPA = "demoschool@icici";
 const DEFAULT_SCHOOL_NAME = "Finora Smart School";
 
 /**
  * Builds an NPCI-standard UPI deep link string.
  * Format: upi://pay?pa=VPA&pn=NAME&tr=REF&am=AMOUNT&cu=INR
+ *
+ * NOTE: Direct UPI intent links bypass payment gateway webhooks.
+ * Before attaching to UI, an out-of-band bank statement reconciliation pipeline
+ * or Razorpay UPI Collect API must be wired to process transaction state changes.
  */
 export function buildDynamicUpiUri(params: DynamicUpiParams): string {
-  const vpa = params.schoolVpa || DEFAULT_VPA;
+  if (!params.schoolVpa || params.schoolVpa.trim() === "") {
+    throw new Error("schoolVpa is required to build a Dynamic UPI URI.");
+  }
+  const vpa = params.schoolVpa.trim();
   const name = encodeURIComponent(params.schoolName || DEFAULT_SCHOOL_NAME);
   const ref = encodeURIComponent(params.feeAssignmentId);
   const amount = params.amountRupees.toFixed(2);

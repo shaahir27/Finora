@@ -60,8 +60,6 @@ export async function syncOfflinePayment(
     );
   }
 
-  await requireAdminForSchool(schoolId);
-
   try {
     const result = await recordPayment(adminId, schoolId, {
       feeAssignmentId,
