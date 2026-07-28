@@ -4,7 +4,8 @@
 // Do NOT rename columns. Other sessions depend on these exact names per AI_INSTRUCTIONS.md.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -252,6 +253,7 @@ model FeeAssignment {
   waivers      Waiver[]
   reminderLogs ReminderLog[]
 
+  @@index([schoolId])
   @@index([studentId])
   @@index([feeTypeId])
   @@index([dueDate])

@@ -4,6 +4,8 @@ import { prisma, type Student, type StudentStatus, type BalanceDisposition } fro
 import { calculateRemainingBalance, calculateWaivedAmount, calculateAmountPaid } from "@smart-school/rules";
 import { applyWaiver } from "./ledger"; // We'll build this in Phase 5
 import { requireAdminForSchool } from "@/lib/require-session";
+import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { getDemoStudents, getDemoStudentProfile } from "@/lib/demo-data";
 
 /**
  * Creates a new student.
@@ -13,6 +15,8 @@ export async function createStudent(
   schoolId: string,
   data: { name: string; class: string; admissionNumber?: string }
 ): Promise<Student> {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   await requireAdminForSchool(schoolId);
 
   // Enforce admission number uniqueness per school if provided
@@ -56,6 +60,7 @@ export async function bulkImportStudents(
   schoolId: string,
   studentsData: Array<{ name: string; class: string; admissionNumber?: string }>
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   await requireAdminForSchool(schoolId);
 
   const succeeded: Student[] = [];
@@ -137,6 +142,7 @@ export async function updateStudent(
   studentId: string,
   changes: { name?: string; class?: string; admissionNumber?: string }
 ): Promise<Student> {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   const existing = await prisma.student.findUnique({ where: { id: studentId } });
   if (!existing) throw new Error("Student not found");
   await requireAdminForSchool(existing.schoolId);
@@ -156,6 +162,7 @@ export async function updateStudentStatus(
   adminId: string,
   data: { status: StudentStatus; balanceDisposition?: BalanceDisposition }
 ): Promise<Student> {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   const targetStudent = await prisma.student.findUnique({ where: { id: studentId } });
   if (!targetStudent) throw new Error("Student not found");
   const { adminId: sessionAdminId } = await requireAdminForSchool(targetStudent.schoolId);
@@ -243,6 +250,7 @@ export async function updateStudentStatus(
  * School-scoped read-only aggregation.
  */
 export async function getStudentProfile(schoolId: string, studentId: string) {
+  if (isDemoMode()) return getDemoStudentProfile(studentId);
   await requireAdminForSchool(schoolId);
 
   const student = await prisma.student.findFirst({
@@ -322,6 +330,8 @@ export async function getStudents(
     limit?: number;
   }
 ) {
+  if (isDemoMode()) return getDemoStudents();
+
   await requireAdminForSchool(schoolId);
 
   const limit = options?.limit || 50;

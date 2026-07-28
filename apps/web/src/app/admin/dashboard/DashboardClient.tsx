@@ -64,8 +64,6 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           setRealtimeLive(true);
-        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
-          setRealtimeLive(false);
         }
       });
 
@@ -78,6 +76,8 @@ export function DashboardClient({ schoolId }: { schoolId: string }) {
     queryKey: ['ledgerSnapshot', schoolId, lastUpdate],
     queryFn: () => getLedgerSnapshot(schoolId, { limit: 10 }),
     isRealtimeLive: realtimeLive,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const handleExport = () => {

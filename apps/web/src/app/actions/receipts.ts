@@ -5,6 +5,7 @@ import { renderToStream } from "@react-pdf/renderer";
 import { ReceiptPdf } from "@/components/ReceiptPdf";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdminForSchool, requireParentSession, UnauthorizedError } from "@/lib/require-session";
+import { isDemoMode } from "@/lib/demo-mode";
 import React from "react";
 
 /**
@@ -20,6 +21,8 @@ export async function generateReceipt(
   transactionId: string,
   format: ReceiptFormat
 ): Promise<{ pdfUrl: string; receiptNumber: string }> {
+  if (isDemoMode()) return { pdfUrl: "#demo-receipt", receiptNumber: "RCP-DEMO-2026-001" };
+
   // --- Phase 1: short transaction — lock, validate, reserve ---
   const reserved = await prisma.$transaction(async (tx) => {
     const transaction = await tx.transaction.findUnique({

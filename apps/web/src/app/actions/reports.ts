@@ -4,6 +4,8 @@ import { getLedgerSnapshot } from "./ledger";
 import { prisma } from "@smart-school/db";
 import { rateLimit } from "@/lib/rateLimit";
 import { requireAdminForSchool } from "@/lib/require-session";
+import { isDemoMode } from "@/lib/demo-mode";
+import { getDemoReportResult } from "@/lib/demo-data";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { renderToStream } from "@react-pdf/renderer";
 import { ReconciliationReportPdf } from "@/components/ReconciliationReportPdf";
@@ -82,6 +84,8 @@ export async function generateReconciliationReport(
   endDate: string,
   format: "csv" | "pdf"
 ): Promise<{ url: string; count: number }> {
+  if (isDemoMode()) return getDemoReportResult();
+
   const { adminId } = await requireAdminForSchool(schoolId);
 
   if (!rateLimit(`${adminId}:generateReconciliationReport`, { limit: 10, windowMs: 60 * 1000 })) {
@@ -179,6 +183,8 @@ export async function exportTallyXmlReport(
   startDate?: string,
   endDate?: string
 ): Promise<{ url: string; count: number }> {
+  if (isDemoMode()) return getDemoReportResult();
+
   const { adminId } = await requireAdminForSchool(schoolId);
 
   const start = parseSafeDate(startDate, false);

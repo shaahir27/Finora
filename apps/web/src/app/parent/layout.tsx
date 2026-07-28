@@ -113,8 +113,8 @@ function ParentLayoutInner({ children }: { children: ReactNode }) {
     return <I18nProvider>{children}</I18nProvider>;
   }
 
-  // Auth check pending
-  if (status === "loading") {
+  // Auth check pending or unauthenticated (prevent parent portal UI shell flash)
+  if (status === "loading" || status === "unauthenticated") {
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(76,175,130,0.4)", borderTopColor: "transparent" }} />

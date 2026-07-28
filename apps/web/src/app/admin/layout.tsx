@@ -77,8 +77,8 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  // Auth check pending
-  if (status === "loading") {
+  // Auth check pending or unauthenticated (prevent dashboard UI shell flash)
+  if (status === "loading" || status === "unauthenticated") {
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(15,90,71,0.5)", borderTopColor: "transparent" }} />

@@ -19,6 +19,8 @@ import {
 } from "@smart-school/rules";
 import { notifySchoolAdmins, sendPushNotification } from "./push";
 import { requireAdminForSchool } from "@/lib/require-session";
+import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { getDemoLedgerSnapshot } from "@/lib/demo-data";
 
 /**
  * The core payment recording function.
@@ -38,6 +40,8 @@ export async function recordPaymentInternal(
     refNumber?: string;
   }
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   if (data.amount <= 0) {
     throw new Error("Payment amount must be greater than zero.");
   }
@@ -272,6 +276,8 @@ export async function reverseTransaction(
   transactionId: string,
   reason: string
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   const result = await prisma.$transaction(async (tx) => {
     const transaction = await tx.transaction.findUnique({
       where: { id: transactionId },
@@ -306,6 +312,8 @@ export async function applyPenalty(
   arg3: any,
   arg4?: any
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   let schoolId: string | undefined;
   let transactionId: string;
   let data: { amount: number; reason: string };
@@ -418,6 +426,7 @@ export async function markChequeBounced(
   transactionId: string,
   reason: string
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   if (!reason || reason.trim() === "") {
     throw new Error("A reason is required to mark a cheque as bounced.");
   }
@@ -549,6 +558,7 @@ export async function applyWaiver(
     reason: string;
   }
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   if (!adminId || adminId.trim() === "") {
     throw new Error("An approver is required to apply a waiver.");
   }
@@ -677,6 +687,7 @@ export async function resolveAnomaly(
   resolution: "posted" | "reversed",
   notes?: string
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   const transaction = await prisma.transaction.findUnique({
     where: { id: transactionId },
   });
@@ -729,22 +740,17 @@ export async function resolveAnomaly(
 
 function serializeTransaction(t: any) {
   if (!t) return t;
-  return {
-    ...t,
-    amount: typeof t.amount === "number" ? t.amount : t.amount?.toNumber ? t.amount.toNumber() : Number(t.amount || 0),
-    feeAssignment: t.feeAssignment
-      ? {
-          ...t.feeAssignment,
-          amount: typeof t.feeAssignment.amount === "number" ? t.feeAssignment.amount : t.feeAssignment.amount?.toNumber ? t.feeAssignment.amount.toNumber() : Number(t.feeAssignment.amount || 0),
-          feeType: t.feeAssignment.feeType
-            ? {
-                ...t.feeAssignment.feeType,
-                gstRate: typeof t.feeAssignment.feeType.gstRate === "number" ? t.feeAssignment.feeType.gstRate : t.feeAssignment.feeType.gstRate?.toNumber ? t.feeAssignment.feeType.gstRate.toNumber() : Number(t.feeAssignment.feeType.gstRate || 0),
-              }
-            : t.feeAssignment.feeType,
-        }
-      : t.feeAssignment,
-  };
+  return JSON.parse(
+    JSON.stringify(t, (key, value) => {
+      if (value && typeof value === "object" && typeof value.toNumber === "function") {
+        return value.toNumber();
+      }
+      if (value && typeof value === "object" && (value.constructor?.name === "Decimal" || Array.isArray(value.d))) {
+        return Number(value);
+      }
+      return value;
+    })
+  );
 }
 
 /**
@@ -762,6 +768,8 @@ export async function getLedgerSnapshot(
     limit?: number;
   }
 ) {
+  if (isDemoMode()) return getDemoLedgerSnapshot();
+
   try {
     const limit = options?.limit || 50;
 
@@ -787,23 +795,48 @@ export async function getLedgerSnapshot(
       if (validEnd) where.postedAt.lte = validEnd;
     }
 
-    // R3-3: Only include posted for total collected (exclude flagged, reversed, cheque_pending)
-    const collectedWhere = { ...where, reconciliationStatus: "posted" };
-    const { _sum } = await prisma.transaction.aggregate({
-      where: collectedWhere,
-      _sum: { amount: true },
-    });
-
-    const transactions = await prisma.transaction.findMany({
-      where,
-      take: limit + 1,
-      ...(options?.cursor ? { cursor: { id: options.cursor } } : {}),
-      orderBy: { postedAt: "desc" },
-      include: {
-        student: { select: { id: true, name: true, admissionNumber: true } },
-        feeAssignment: { include: { feeType: true } },
-      },
-    });
+    const [
+      transactions,
+      statusGroupData,
+      duesRaw,
+      channelData,
+    ] = await Promise.all([
+      // 1. Transaction list for ledger table (paginated)
+      prisma.transaction.findMany({
+        where,
+        take: limit + 1,
+        ...(options?.cursor ? { cursor: { id: options.cursor } } : {}),
+        orderBy: { postedAt: "desc" },
+        include: {
+          student: { select: { id: true, name: true, admissionNumber: true } },
+          feeAssignment: { include: { feeType: true } },
+        },
+      }),
+      // 2. Status grouping (sum + count for posted, cheque_pending, flagged, reversed in 1 single query)
+      prisma.transaction.groupBy({
+        by: ["reconciliationStatus"],
+        where: { schoolId },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      // 3. Raw SQL fast aggregate for outstanding dues total
+      prisma.$queryRaw<Array<{ outstanding: number | string | null }>>`
+        SELECT COALESCE(SUM(
+          GREATEST(0, fa.amount - 
+            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fee_assignment_id = fa.id AND t.reconciliation_status = 'posted'), 0) - 
+            COALESCE((SELECT SUM(w.amount) FROM waivers w WHERE w.fee_assignment_id = fa.id), 0)
+          )
+        ), 0) AS outstanding
+        FROM fee_assignments fa
+        WHERE fa.school_id = ${schoolId};
+      `,
+      // 4. Revenue grouped by channel (posted only)
+      prisma.transaction.groupBy({
+        by: ["channel"],
+        where: { schoolId, reconciliationStatus: "posted" },
+        _sum: { amount: true },
+      }),
+    ]);
 
     let nextCursor: string | undefined = undefined;
     if (transactions.length > limit) {
@@ -811,61 +844,18 @@ export async function getLedgerSnapshot(
       nextCursor = nextItem?.id;
     }
 
-    // Metrics calculations for dashboard & KPI banner
-    const [pendingChequeAgg, flaggedAgg, reversedAgg] = await Promise.all([
-      prisma.transaction.aggregate({
-        where: { schoolId, reconciliationStatus: "cheque_pending" },
-        _sum: { amount: true },
-        _count: { id: true },
-      }),
-      prisma.transaction.aggregate({
-        where: { schoolId, reconciliationStatus: "flagged" },
-        _sum: { amount: true },
-        _count: { id: true },
-      }),
-      prisma.transaction.aggregate({
-        where: { schoolId, reconciliationStatus: "reversed" },
-        _sum: { amount: true },
-        _count: { id: true },
-      }),
-    ]);
+    const outstandingDuesTotal = Number(duesRaw[0]?.outstanding || 0);
 
-    // Outstanding Dues
-    const assignments = await prisma.feeAssignment.findMany({
-      where: { schoolId },
-      include: {
-        transactions: { select: { amount: true, reconciliationStatus: true } },
-        waivers: { select: { amount: true } }
-      }
-    });
+    // Status helpers
+    const postedItem = statusGroupData.find(s => s.reconciliationStatus === "posted");
+    const pendingChequeItem = statusGroupData.find(s => s.reconciliationStatus === "cheque_pending");
+    const flaggedItem = statusGroupData.find(s => s.reconciliationStatus === "flagged");
+    const reversedItem = statusGroupData.find(s => s.reconciliationStatus === "reversed");
 
-    let outstandingDuesTotal = 0;
-    for (const a of assignments) {
-      const paid = calculateAmountPaid(a.transactions);
-      const waived = calculateWaivedAmount(a.waivers);
-      const bal = calculateRemainingBalance(a.amount.toNumber(), paid, waived);
-      if (bal > 0) {
-        outstandingDuesTotal += bal;
-      }
-    }
-
-    // Reconciliation Stats
-    const allTx = await prisma.transaction.findMany({
-      where: { schoolId },
-      select: { reconciliationStatus: true }
-    });
-
-    const totalTx = allTx.length;
-    const postedTx = allTx.filter(t => t.reconciliationStatus === "posted").length;
-    const flaggedCount = allTx.filter(t => t.reconciliationStatus === "flagged").length;
+    const totalTx = statusGroupData.reduce((sum, s) => sum + (s._count.id || 0), 0);
+    const postedTx = postedItem?._count.id || 0;
+    const flaggedCount = flaggedItem?._count.id || 0;
     const matchPercentage = totalTx > 0 ? Math.round((postedTx / totalTx) * 100) : 100;
-
-    // Revenue by channel (posted only)
-    const channelData = await prisma.transaction.groupBy({
-      by: ['channel'],
-      where: { schoolId, reconciliationStatus: "posted" },
-      _sum: { amount: true }
-    });
 
     const revenueByChannel = [
       { channel: 'upi', amount: channelData.find(c => c.channel === 'upi')?._sum.amount?.toNumber() || 0 },
@@ -876,13 +866,13 @@ export async function getLedgerSnapshot(
     return {
       transactions: transactions.map(t => serializeTransaction(t)),
       nextCursor,
-      totalCollected: _sum.amount?.toNumber() || 0,
-      pendingChequeTotal: pendingChequeAgg._sum.amount?.toNumber() || 0,
-      pendingChequeCount: pendingChequeAgg._count.id || 0,
-      flaggedTotal: flaggedAgg._sum.amount?.toNumber() || 0,
-      flaggedCount: flaggedAgg._count.id || 0,
-      reversedTotal: reversedAgg._sum.amount?.toNumber() || 0,
-      reversedCount: reversedAgg._count.id || 0,
+      totalCollected: postedItem?._sum.amount?.toNumber() || 0,
+      pendingChequeTotal: pendingChequeItem?._sum.amount?.toNumber() || 0,
+      pendingChequeCount: pendingChequeItem?._count.id || 0,
+      flaggedTotal: flaggedItem?._sum.amount?.toNumber() || 0,
+      flaggedCount,
+      reversedTotal: reversedItem?._sum.amount?.toNumber() || 0,
+      reversedCount: reversedItem?._count.id || 0,
       outstandingDuesTotal,
       reconciliationStats: {
         matchPercentage,
@@ -1001,6 +991,7 @@ export async function batchClearChequesAction(
   schoolId: string,
   transactionIds: string[]
 ): Promise<{ clearedCount: number; totalAmount: number }> {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
 
   if (!transactionIds || transactionIds.length === 0) {

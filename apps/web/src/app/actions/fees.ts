@@ -2,6 +2,7 @@
 
 import { prisma, type FeeAssignment, type GstTreatment } from "@smart-school/db";
 import { requireAdminForSchool } from "@/lib/require-session";
+import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
 
 // Helper — strips Prisma Decimal from a FeeType row before it crosses the RSC boundary.
 function serializeFeeType(ft: any) {
@@ -24,6 +25,8 @@ export async function createFeeType(
     gstRate?: number;
   }
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   await requireAdminForSchool(schoolId);
 
   if (data.gstTreatment === "taxable" && (data.gstRate === undefined || data.gstRate === null || data.gstRate <= 0)) {
@@ -58,6 +61,7 @@ export async function updateFeeSchema(
     gstRate?: number | null;
   }
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   // Fetch existing first to validate GST combinations
   const existing = await prisma.feeType.findUnique({ where: { id: feeTypeId } });
   if (!existing) throw new Error("FeeType not found");

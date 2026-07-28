@@ -19,6 +19,8 @@ import {
   calculateRemainingBalance,
 } from "@smart-school/rules";
 import { requireAdminForSchool } from "@/lib/require-session";
+import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { getDemoReminders } from "@/lib/demo-data";
 
 export interface ReminderQueueItem {
   id: string;
@@ -50,6 +52,8 @@ export async function getRemindersQueue(
   schoolId: string,
   options?: { status?: ReminderStatus; limit?: number; cursor?: string }
 ): Promise<{ reminders: ReminderQueueItem[]; nextCursor: string | undefined }> {
+  if (isDemoMode()) return getDemoReminders();
+
   await requireAdminForSchool(schoolId);
 
   const limit = options?.limit ?? 50;
@@ -144,6 +148,8 @@ const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_key");
  * Email: Sends via Resend if parent email exists.
  */
 export async function markReminderSent(reminderLogId: string): Promise<{ status: ReminderStatus; dispatchError: string | null }> {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   const log = await prisma.reminderLog.findUnique({
     where: { id: reminderLogId },
     include: {
@@ -199,7 +205,7 @@ export async function markReminderSent(reminderLogId: string): Promise<{ status:
 
     try {
       await resend.emails.send({
-        from: "Finora <noreply@finora.school>",
+        from: process.env.RESEND_FROM_EMAIL || "Finora <onboarding@resend.dev>",
         to: parentEmail,
         subject: `Payment Reminder - Tier ${log.tier}`,
         text: log.draftedText,

@@ -15,7 +15,7 @@ import { OfflineSyncStatusBadge } from "@/components/OfflineSyncStatusBadge";
 import { DEMO_SCHOOL_ID } from "@/lib/school-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { BookOpen, ScanLine, WifiOff, Printer, X, Download, FileText, CheckCircle2, AlertTriangle, Search, Zap, CheckSquare, Eye } from "lucide-react";
+import { BookOpen, ScanLine, WifiOff, Printer, X, XCircle, Download, FileText, CheckCircle2, AlertTriangle, Search, Zap, CheckSquare, Eye } from "lucide-react";
 import type { OcrExtractionResult } from "@smart-school/ai";
 
 import { PosReceiptModal } from "@/components/PosReceiptModal";
@@ -329,50 +329,70 @@ export default function AdminLedgerPage() {
       </div>
 
       {/* Top Segmented Workspace Controller */}
-      <div className="flex bg-white/70 p-1.5 rounded-2xl border border-border-glass max-w-3xl shadow-sm overflow-x-auto">
+      <div className="grid grid-cols-2 md:flex bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border border-emerald-900/10 max-w-4xl shadow-sm overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [::-webkit-scrollbar]:hidden gap-1.5">
         <button
           onClick={() => setActiveTab("ledger")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+          className={`flex items-center justify-between gap-2.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
             activeTab === "ledger"
-              ? "bg-[#0F5A47] text-white shadow-md"
+              ? "bg-[#0F5A47] text-white shadow-md shadow-emerald-900/20"
               : "text-text-secondary hover:text-text-primary hover:bg-black/5"
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          Master Ledger
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4" />
+            <span>Master Ledger</span>
+          </div>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${activeTab === "ledger" ? "bg-white/20 text-white" : "bg-black/5 text-text-secondary"}`}>
+            Journal
+          </span>
         </button>
         <button
           onClick={() => setActiveTab("bank_reconcile")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+          className={`flex items-center justify-between gap-2.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
             activeTab === "bank_reconcile"
-              ? "bg-[#0F5A47] text-white shadow-md"
+              ? "bg-[#0F5A47] text-white shadow-md shadow-emerald-900/20"
               : "text-text-secondary hover:text-text-primary hover:bg-black/5"
           }`}
         >
-          <Zap className="w-4 h-4 text-amber-300" />
-          Bank Auto-Match
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-300 fill-amber-300/30" />
+            <span>Bank Auto-Match</span>
+          </div>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${activeTab === "bank_reconcile" ? "bg-amber-400/20 text-amber-200" : "bg-amber-500/10 text-amber-700"}`}>
+            AI Match
+          </span>
         </button>
         <button
           onClick={() => setActiveTab("ocr")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+          className={`flex items-center justify-between gap-2.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
             activeTab === "ocr"
-              ? "bg-[#0F5A47] text-white shadow-md"
+              ? "bg-[#0F5A47] text-white shadow-md shadow-emerald-900/20"
               : "text-text-secondary hover:text-text-primary hover:bg-black/5"
           }`}
         >
-          <ScanLine className="w-4 h-4" />
-          OCR Scanner
+          <div className="flex items-center gap-2">
+            <ScanLine className="w-4 h-4 text-emerald-400" />
+            <span>OCR Scanner</span>
+          </div>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${activeTab === "ocr" ? "bg-white/20 text-white" : "bg-emerald-500/10 text-emerald-700"}`}>
+            Scan
+          </span>
         </button>
         <button
           onClick={() => setActiveTab("offline")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+          className={`flex items-center justify-between gap-2.5 py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
             activeTab === "offline"
-              ? "bg-[#0F5A47] text-white shadow-md"
+              ? "bg-[#0F5A47] text-white shadow-md shadow-emerald-900/20"
               : "text-text-secondary hover:text-text-primary hover:bg-black/5"
           }`}
         >
-          <WifiOff className="w-4 h-4" />
-          Offline Sync
+          <div className="flex items-center gap-2">
+            <WifiOff className="w-4 h-4 text-sky-300" />
+            <span>Offline Sync</span>
+          </div>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${activeTab === "offline" ? "bg-white/20 text-white" : "bg-sky-500/10 text-sky-700"}`}>
+            Queue
+          </span>
         </button>
       </div>
 
@@ -608,46 +628,85 @@ export default function AdminLedgerPage() {
                               {t.reconciliationStatus}
                             </span>
                           </td>
-                          <td className="px-3.5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-3.5 py-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             {t.reconciliationStatus === "reversed" ? (
-                              <span className="text-[10px] text-text-secondary font-bold italic">No Actions</span>
+                              <span className="text-[10px] text-text-secondary font-semibold italic bg-gray-100 px-2 py-1 rounded-md">Reversed</span>
                             ) : (
-                              <select
-                                defaultValue=""
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  e.target.value = "";
-                                  if (val === "inspect") setInspectedTxId(t.id);
-                                  else if (val === "receipt") setReceiptTx(t);
-                                  else if (val === "pos_receipt") setPosReceiptTx(t);
-                                  else if (val === "clear_cheque") openAction(t, "clear_cheque");
-                                  else if (val === "bounce_cheque") openAction(t, "bounce_cheque");
-                                  else if (val === "resolve_anomaly") openAction(t, "resolve_anomaly");
-                                  else if (val === "apply_penalty") openAction(t, "apply_penalty");
-                                  else if (val === "reverse") openAction(t, "reverse");
-                                }}
-                                className="bg-white border border-[#0F5A47]/25 hover:border-[#0F5A47] text-[#0F5A47] text-xs font-bold px-3 py-1.5 rounded-xl outline-none transition-all shadow-xs cursor-pointer"
-                              >
-                                <option value="" disabled>Manage Options ▾</option>
-                                <option value="inspect">🔍 Inspect Audit Trail</option>
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Primary Quick Action Buttons */}
                                 {t.reconciliationStatus === "posted" && (
                                   <>
-                                    <option value="receipt">📄 Download A4 Receipt</option>
-                                    <option value="pos_receipt">🖨️ POS 80mm Receipt</option>
-                                    <option value="apply_penalty">🏷️ Apply Late Penalty</option>
-                                    <option value="reverse">🔄 Reverse Entry</option>
+                                    <button
+                                      onClick={() => setReceiptTx(t)}
+                                      title="Download A4 PDF Receipt"
+                                      className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-1 rounded-lg border border-emerald-200 transition-all active:scale-95 shadow-xs"
+                                    >
+                                      <FileText className="w-3.5 h-3.5" />
+                                      <span>Receipt</span>
+                                    </button>
+                                    <button
+                                      onClick={() => setPosReceiptTx(t)}
+                                      title="Print 80mm POS Thermal Slip"
+                                      className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-2 py-1 rounded-lg border border-slate-300 transition-all active:scale-95 shadow-xs"
+                                    >
+                                      <Printer className="w-3.5 h-3.5" />
+                                      <span>POS</span>
+                                    </button>
                                   </>
                                 )}
+
                                 {t.reconciliationStatus === "cheque_pending" && (
                                   <>
-                                    <option value="clear_cheque">✅ Clear Cheque</option>
-                                    <option value="bounce_cheque">❌ Mark Bounced</option>
+                                    <button
+                                      onClick={() => openAction(t, "clear_cheque")}
+                                      className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-2.5 py-1 rounded-lg transition-all active:scale-95 shadow-xs"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>Clear</span>
+                                    </button>
+                                    <button
+                                      onClick={() => openAction(t, "bounce_cheque")}
+                                      className="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold px-2 py-1 rounded-lg border border-rose-200 transition-all active:scale-95 shadow-xs"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                      <span>Bounce</span>
+                                    </button>
                                   </>
                                 )}
+
                                 {t.reconciliationStatus === "flagged" && (
-                                  <option value="resolve_anomaly">⚠️ Resolve Anomaly</option>
+                                  <button
+                                    onClick={() => openAction(t, "resolve_anomaly")}
+                                    className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1 rounded-lg transition-all active:scale-95 shadow-md shadow-amber-500/20 animate-pulse"
+                                  >
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    <span>Resolve Anomaly</span>
+                                  </button>
                                 )}
-                              </select>
+
+                                {/* Secondary Actions Dropdown */}
+                                <select
+                                  defaultValue=""
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    e.target.value = "";
+                                    if (val === "inspect") setInspectedTxId(t.id);
+                                    else if (val === "apply_penalty") openAction(t, "apply_penalty");
+                                    else if (val === "reverse") openAction(t, "reverse");
+                                  }}
+                                  className="bg-white/80 hover:bg-white border border-gray-200 text-gray-700 text-xs font-medium py-1 px-1.5 rounded-lg outline-none cursor-pointer transition-all shadow-xs"
+                                  title="More Management Options"
+                                >
+                                  <option value="" disabled>•••</option>
+                                  <option value="inspect">🔍 Inspect Audit Trail</option>
+                                  {t.reconciliationStatus === "posted" && (
+                                    <>
+                                      <option value="apply_penalty">🏷️ Apply Late Penalty</option>
+                                      <option value="reverse">🔄 Reverse Entry</option>
+                                    </>
+                                  )}
+                                </select>
+                              </div>
                             )}
                           </td>
                         </tr>

@@ -10,8 +10,12 @@ import {
 } from "@smart-school/rules";
 import { requireAdminForSchool } from "@/lib/require-session";
 import { draftReminderTextAction } from "./ai";
+import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { getDemoDefaulters } from "@/lib/demo-data";
 
 export async function getDefaulters(schoolId: string) {
+  if (isDemoMode()) return getDemoDefaulters();
+
   await requireAdminForSchool(schoolId);
 
   // 1. Fetch all active students and their fee assignments (with transactions and waivers)
@@ -103,7 +107,9 @@ export async function getDefaulters(schoolId: string) {
 
       const existingToday = existingByStudent.get(student.id);
       if (existingToday) {
-        toUpdate.push({ id: existingToday.id, riskLevel: riskLevelInt, computedReason: score.reason });
+        if (existingToday.riskLevel !== riskLevelInt || existingToday.computedReason !== score.reason) {
+          toUpdate.push({ id: existingToday.id, riskLevel: riskLevelInt, computedReason: score.reason });
+        }
       } else {
         toCreate.push({ studentId: student.id, schoolId, riskLevel: riskLevelInt, computedReason: score.reason });
       }
@@ -132,6 +138,8 @@ export async function getDefaulters(schoolId: string) {
 }
 
 export async function queueRemindersForStudent(schoolId: string, studentId: string) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   await requireAdminForSchool(schoolId);
 
   const student = await prisma.student.findFirst({
@@ -189,6 +197,8 @@ export async function queueRemindersForStudent(schoolId: string, studentId: stri
 }
 
 export async function escalateDefaulterScore(schoolId: string, studentId: string) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   const { adminId } = await requireAdminForSchool(schoolId);
 
   const todayStart = new Date();
@@ -241,6 +251,8 @@ export async function escalateDefaulterScore(schoolId: string, studentId: string
  * Triggers batch reminder generation for multiple defaulter students at once.
  */
 export async function batchQueueRemindersAction(schoolId: string, studentIds: string[]) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   await requireAdminForSchool(schoolId);
 
   let totalQueued = 0;

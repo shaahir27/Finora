@@ -43,8 +43,8 @@ export default function HouseholdCockpitPage() {
     },
     {
       id: "stu-102",
-      name: "Ananya Sharma",
-      class: "Grade 6-B",
+      name: "Kabir Sharma",
+      class: "Grade 8-B",
       admNo: "ADM-2026-002",
       dues: 4500,
       status: "pending",

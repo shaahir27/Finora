@@ -72,6 +72,11 @@ status: "Built"
 * **Root cause:** The Gemini model name `gemini-1.5-flash` was hardcoded, causing a 404 when using the user's API key.
 * **Fix:** Updated to use `process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite"`, which aligns with the correct model access.
 
+### Feature 11 — Graceful Demo Fallback Mode without DATABASE_URL (HIGH)
+* **Files:** `apps/web/src/lib/demo-mode.ts`, `apps/web/src/lib/demo-data.ts`, `apps/web/src/app/actions/*.ts`, `.env.example`
+* **Root cause:** When judges clone the repository or visit a deployed URL without a valid `DATABASE_URL` configured in `.env`, server actions would crash with DB connection errors (`Can't reach database server`).
+* **Fix:** Added `isDemoMode()` check in `demo-mode.ts`. When `DATABASE_URL` is missing or unconfigured, server actions automatically serve realistic hardcoded demo datasets (`demo-data.ts`) across all pages, while write actions return clean user-facing demo notifications instead of throwing unhandled DB connection exceptions. When `DATABASE_URL` is set, the application operates 100% against the live PostgreSQL database.
+
 ## 5. Testing & Verification
 * **Automated tests:** Existing tests still pass. All TypeScript checks pass via `tsc --noEmit`.
 * **Manually verified:**

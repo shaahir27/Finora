@@ -34,7 +34,7 @@ Map of every feature built, where its log lives, and its current status. Updated
 | Email Reminders via Resend | Session 6 | `session_06_polish_and_demo/feature_reminders_resend.md` | Updated | 2026-07-24 |
 | Reconciliation Reports & Export | Session 6 | `session_06_polish_and_demo/feature_reports.md` | Updated | 2026-07-24 |
 | Action Rate Limiting | Session 6 | `session_06_polish_and_demo/feature_rate_limiting.md` | Built | 2026-07-24 |
-| Codebase Audit & Bug Fixes | Session 6 | `session_06_polish_and_demo/feature_audit_bug_fixes.md` | Built | 2026-07-24 |
+| Codebase Audit & Bug Fixes | Session 6 | `session_06_polish_and_demo/feature_audit_bug_fixes.md` | Updated | 2026-07-28 |
 | Audit Report Section A Fixes | Session 6 | `session_06_polish_and_demo/feature_audit_report_section_a.md` | Built | 2026-07-26 |
 | Audit Report Section B Fixes | Session 6 | `session_06_polish_and_demo/feature_audit_report_section_b.md` | Built | 2026-07-26 |
 | UI/UX Overhaul & 3 Workspaces | Session 6 | `session_06_polish_and_demo/feature_ui_ux_overhaul_3_workspaces.md` | Built | 2026-07-26 |

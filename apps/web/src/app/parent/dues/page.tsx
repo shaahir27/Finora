@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import {
+  getParentInitData,
   getMyChildrenDues,
   getMyChildren,
   getParentLinkId,
@@ -69,31 +70,13 @@ export default function ParentDuesPage() {
 
   useEffect(() => {
     if (status === "loading") return;
-    const parentUserId = session?.user?.id || "demo-parent-id";
 
-    // Cache parentLinkId and schoolId for Copilot
-    if (!sessionStorage.getItem("finora_parent_link_id")) {
-      getParentLinkId()
-        .then((id) => {
-          if (id) sessionStorage.setItem("finora_parent_link_id", id);
-        })
-        .catch(console.error);
-    }
-    if (!sessionStorage.getItem("finora_school_id")) {
-      getParentSchoolId()
-        .then((id) => {
-          if (id) sessionStorage.setItem("finora_school_id", id);
-        })
-        .catch(console.error);
-    }
-
-    Promise.all([
-      getMyChildren(),
-      getMyChildrenDues(),
-    ])
-      .then(([kids, duesData]) => {
-        setChildrenList(kids);
-        setDues(duesData);
+    getParentInitData()
+      .then((data) => {
+        if (data.parentLinkId) sessionStorage.setItem("finora_parent_link_id", data.parentLinkId);
+        if (data.schoolId) sessionStorage.setItem("finora_school_id", data.schoolId);
+        setChildrenList(data.children || []);
+        setDues(data.dues || []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));

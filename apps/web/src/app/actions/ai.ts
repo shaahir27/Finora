@@ -17,6 +17,7 @@
 import { prisma, type ReminderChannel } from "@smart-school/db";
 import { rateLimit } from "@/lib/rateLimit";
 import { requireAdminForSchool, requireParentSession } from "@/lib/require-session";
+import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
 import {
   narrateDefaulterInsight,
   answerDashboardQuery,
@@ -49,6 +50,7 @@ export async function narrateDefaulterInsightAction(
   schoolId: string,
   studentId: string
 ): Promise<string | null> {
+  if (isDemoMode()) return "Rahul Sharma has an overdue balance of ₹7,000 for Tuition Fee Q1. Recommendation: Send Tier 1 email reminder.";
   await requireAdminForSchool(schoolId);
 
   const student = await prisma.student.findFirst({
@@ -125,6 +127,7 @@ export async function answerDashboardQueryAction(
   schoolId: string,
   question: string
 ): Promise<string> {
+  if (isDemoMode()) return "In Demo Mode: Total collected today is ₹148,500 across 6 transactions with a 94% reconciliation match rate.";
   const { adminId } = await requireAdminForSchool(schoolId);
   if (!rateLimit(`${adminId}:answerDashboardQuery`, { limit: 10, windowMs: 60 * 1000 })) {
     throw new Error("Rate limit exceeded. Please try again later.");
@@ -143,7 +146,7 @@ export async function answerDashboardQueryAction(
       amount: Number(t.amount),
       reconciliationStatus: t.reconciliationStatus,
       studentName: t.student?.name,
-      postedAt: t.postedAt.toISOString(),
+      postedAt: typeof t.postedAt === "string" ? t.postedAt : t.postedAt?.toISOString ? t.postedAt.toISOString() : new Date(t.postedAt).toISOString(),
     })),
   };
 
@@ -157,6 +160,7 @@ export async function answerDashboardQueryAction(
 // If it fails, the flag_reason is always available as fallback.
 // ---------------------------------------------------------------------------
 export async function narrateAnomalyAction(anomalyFlagId: string): Promise<void> {
+  if (isDemoMode()) return;
   const flag = await prisma.anomalyFlag.findUnique({
     where: { id: anomalyFlagId },
     include: {
@@ -200,6 +204,7 @@ export async function draftReminderTextAction(
   tier: 1 | 7 | 14,
   channel: ReminderChannel
 ): Promise<{ logId: string; draftedText: string }> {
+  if (isDemoMode()) return { logId: "rem-demo-log-1", draftedText: "Dear Parent, This is a reminder regarding the pending fee balance of ₹7,000. Kindly settle at your earliest convenience." };
   await requireAdminForSchool(schoolId);
 
   const assignment = await prisma.feeAssignment.findFirst({
@@ -310,6 +315,7 @@ export async function processOcrUploadAction(
   schoolId: string,
   imageUrl: string
 ): Promise<{ stagingId: string; extraction: Awaited<ReturnType<typeof processOcrUpload>> }> {
+  if (isDemoMode()) return { stagingId: "ocr-demo-1", extraction: { amount: 12500, date: "2026-07-25", refNumber: "CHQ-20260201", confidence: 0.94, fields: { amount: "12,500", date: "25-Jul-2026", refNumber: "CHQ-20260201" } } };
   const { adminId } = await requireAdminForSchool(schoolId);
   if (!rateLimit(`${adminId}:processOcrUpload`, { limit: 10, windowMs: 60 * 1000 })) {
     throw new Error("Rate limit exceeded. Please try again later.");
@@ -348,6 +354,7 @@ export async function confirmOcrEntryAction(
     refNumber?: string;
   }
 ) {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
   const { adminId: sessionAdminId } = await requireAdminForSchool(schoolId);
 
   const staging = await prisma.ocrStaging.findFirst({
@@ -384,6 +391,7 @@ export async function confirmOcrEntryAction(
 // Gemini narrates; it never computes financial figures itself.
 // ---------------------------------------------------------------------------
 export async function generateWeeklyDigestAction(schoolId: string): Promise<string> {
+  if (isDemoMode()) return "Weekly Summary Digest (Demo Mode):\n- Total Revenue Collected: ₹148,500\n- Reconciliation Rate: 94%\n- Cheque Clearance Pending: 1 cheque (₹18,000)\n- High Risk Defaulters: 1 student (Neha Patel, ₹24,700 overdue)";
   await requireAdminForSchool(schoolId);
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -490,6 +498,7 @@ export async function copilotQueryAction(
     parentLinkId?: string; // for parent role — scopes getMyChildrenDues
   }
 ) {
+  if (isDemoMode()) return { answer: "Hello! Finora AI Copilot is currently running in Demo Mode. I can help answer questions about your school's fee management, defaulter tracking, and bank reconciliation.", toolCalls: [] };
   if (role === "admin") {
     await requireAdminForSchool(schoolId);
   } else {
@@ -520,7 +529,7 @@ export async function copilotQueryAction(
         amount: Number(t.amount),
         reconciliationStatus: t.reconciliationStatus,
         studentName: t.student?.name,
-        postedAt: t.postedAt.toISOString(),
+        postedAt: typeof t.postedAt === "string" ? t.postedAt : t.postedAt?.toISOString ? t.postedAt.toISOString() : new Date(t.postedAt).toISOString(),
       })),
     };
 
@@ -570,9 +579,9 @@ export async function copilotQueryAction(
             amount: a.amount.toNumber(),
             amountPaid: paid,
             remainingBalance: remaining,
-            dueDate: a.dueDate.toISOString().split("T")[0]!,
+            dueDate: typeof a.dueDate === "string" ? a.dueDate : a.dueDate?.toISOString ? a.dueDate.toISOString().split("T")[0]! : new Date(a.dueDate).toISOString().split("T")[0]!,
             paymentStatus:
-              remaining <= 0 ? "paid" : Date.now() > a.dueDate.getTime() ? "overdue" : "pending",
+              remaining <= 0 ? "paid" : Date.now() > new Date(a.dueDate).getTime() ? "overdue" : "pending",
           };
         })
       );
@@ -582,7 +591,7 @@ export async function copilotQueryAction(
           amount: Number(t.amount),
           channel: t.channel,
           status: t.reconciliationStatus,
-          postedAt: t.postedAt.toISOString(),
+          postedAt: typeof t.postedAt === "string" ? t.postedAt : t.postedAt?.toISOString ? t.postedAt.toISOString() : new Date(t.postedAt).toISOString(),
           feeType: t.feeAssignment.feeType.name,
         }))
       );

@@ -19,6 +19,8 @@ import { prisma, type PaymentChannel } from "@smart-school/db";
 import { recordPayment } from "./ledger";
 import { notifySchoolAdmins } from "./push";
 import { requireAdminForSchool } from "@/lib/require-session";
+import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { getDemoSyncConflicts } from "@/lib/demo-data";
 
 // ---------------------------------------------------------------------------
 // syncOfflinePayment
@@ -49,6 +51,8 @@ export async function syncOfflinePayment(
   schoolId: string,
   refNumber?: string
 ): Promise<{ success: true; transaction: object } | { success: false; conflictReason: string }> {
+  if (isDemoMode()) throw new Error(DEMO_WRITE_ERROR);
+
   // Hard rule: UPI cannot be synced offline
   if ((channel as string) === "upi") {
     throw new Error(
@@ -142,15 +146,22 @@ export async function reportSyncConflict(
  * Any admin at the school can view these — not scoped to the submitting admin.
  */
 export async function getSyncConflicts(schoolId: string) {
+  if (isDemoMode()) return getDemoSyncConflicts();
+
   await requireAdminForSchool(schoolId);
 
-  return prisma.offlineSyncConflict.findMany({
+  const conflicts = await prisma.offlineSyncConflict.findMany({
     where: { schoolId, resolved: false },
     orderBy: { createdAt: "asc" },
     include: {
       submittedBy: { select: { id: true, email: true } },
     },
   });
+
+  return conflicts.map((c) => ({
+    ...c,
+    amount: Number(c.amount),
+  }));
 }
 
 // ---------------------------------------------------------------------------

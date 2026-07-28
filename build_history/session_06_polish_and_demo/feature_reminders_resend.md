@@ -22,7 +22,7 @@ status: "Built"
 
 ## 4. Core Logic & Necessary Functions
 * **List of functions & files:**
-  * `markReminderSent` (`apps/web/src/app/actions/reminders.ts`): Only function that changes `REMINDER_LOG.status` from `logged`. Email channel: dispatches via Resend, sets `sent` on success or `failed` + `dispatchError` on error. WhatsApp/SMS: sets `simulated_sent` with no external call.
+  * `markReminderSent` (`apps/web/src/app/actions/reminders.ts`): Only function that changes `REMINDER_LOG.status` from `logged`. Email channel: dispatches via Resend (using `RESEND_FROM_EMAIL` or fallback `Finora <onboarding@resend.dev>`), sets `sent` on success or `failed` + `dispatchError` on error. WhatsApp/SMS: sets `simulated_sent` with no external call.
   ```typescript
   export async function markReminderSent(reminderLogId: string): Promise<void>
   // Note: Code snippets represent the function signature at the time this feature was built.
