@@ -16,8 +16,8 @@ Access the primary product specification and live presentation guides directly f
 ## 🌟 Product Overview & Problem Statement
 
 ### The Problem in School Fee Management
-Traditional K-12 educational institutions across India and emerging markets face severe financial management friction:
-* **Manual Cash & Cheque Reconciliation**: School accountants spend dozens of hours manually matching paper bank receipts and UTR numbers against ledger spreadsheets, leading to untracked cheque bounces and unaccounted cash receipts.
+Traditional K-12 educational institutions face severe financial management friction:
+* **Manual Cash & Cheque Reconciliation**: School accountants spend dozens of hours manually matching paper bank receipts and UTR numbers against spreadsheet ledgers, leading to untracked cheque bounces and unaccounted cash receipts.
 * **Floating-Point Financial Errors**: Generic software platforms use standard floating-point numbers (`0.1 + 0.2 = 0.30000000000000004`), creating cumulative balance drift across thousands of student fee ledgers.
 * **Reactive Defaulter Tracking**: Schools lack real-time visibility into high-risk fee defaulters, relying on manual end-of-month lists that delay fee recovery and cash flow.
 * **Fragmented Parent Communication**: Parents receive irregular paper notices or generic SMS blasts without direct, single-click payment options or immediate tax certificate access.
@@ -27,26 +27,27 @@ Traditional K-12 educational institutions across India and emerging markets face
 
 ---
 
-## 🔬 Core Product Modules & Deep Dive
+## 🔬 Deep Dive: Core System Modules & Features
 
-### 1. 💳 Double-Entry Financial Master Ledger
+### 1. 💳 Double-Entry Financial Master Ledger Engine
 * **Mathematical Invariants**: Enforces strict double-entry ledger rules (`Sum(Debits) = Sum(Credits)`). Revenue is credited to fee category accounts while accounts receivable or bank balances are debited.
 * **Integer Minor-Unit Math**: All currency figures are calculated in minor units (paisa/cents) to guarantee zero floating-point calculation errors.
+* **State Machine Governance**: Manages transaction and fee assignment lifecycle states (`unpaid`, `partially_paid`, `paid`, `overdue`, `cheque_pending`, `flagged`, `bounced`) with strict state-transition guards.
 * **Immutable Audit Trail**: Every financial mutation — including fee creation, waiver application, penalty assessment, cheque bounce marking, and payment posting — generates an immutable `AuditLog` record containing the session `actorId`, timestamp, reason tag, and state diff.
 
-### 2. 🔄 Automated Bank Reconciliation & Anomaly Engine
-* **Automated Bank Statement Parsing**: Accepts electronic bank statement files (CSV/UPI logs) and matches incoming line items against pending student transactions.
+### 2. 🔄 Automated Bank Statement Reconciliation & Anomaly Detection
+* **Automated Statement Parsing**: Accepts electronic bank statement files (CSV/UPI logs) and matches incoming line items against pending student transactions.
 * **Multi-Factor Matching**: Uses UTR/reference numbers, transaction dates, and exact amount matching to achieve automated reconciliation.
-* **Real-time Anomaly Detection**: Automatically detects and flags suspicious transactions, including:
+* **Real-time Anomaly Engine**: Automatically detects and flags suspicious transactions, including:
   - *Duplicate Reference Numbers*: Prevents double-counting duplicate UTRs across channels.
   - *Amount Mismatches*: Flags partial or overpaid amounts for human review.
   - *Unmapped VPAs*: Isolates unidentified bank transfers into an admin review queue.
 
-### 3. 📉 Defaulter Risk Engine & Automated Escalation
-* **Multi-Factor Risk Scoring**: Evaluates student payment history using a weighted scoring model:
+### 3. 📉 Defaulter Risk Engine & Automated Recovery
+* **Multi-Factor Weighted Risk Scoring**: Evaluates student payment history using a weighted scoring model:
   $$\text{Risk Score} = w_1 \cdot \text{Days Overdue} + w_2 \cdot \text{Outstanding Balance Ratio} + w_3 \cdot \text{Broken Promises} + w_4 \cdot \text{Assignment Count}$$
 * **Dynamic Risk Categorization**: Automatically categorizes students into `High Risk` (🔴), `Medium Risk` (🟡), and `Low Risk` (🟢) tiers.
-* **Tiered Reminder Dispatch**: Generates localized, personalized fee reminders for WhatsApp, SMS, or Email with dynamic single-click payment links.
+* **Tiered Reminder Queue**: Generates localized, personalized fee reminders for WhatsApp, SMS, or Email with dynamic single-click payment links.
 
 ### 4. 📱 PWA & Offline Payment Syncing
 * **IndexedDB Offline Storage**: Allows school administrators to record cash or cheque payments in offline or low-connectivity school environments.
@@ -54,7 +55,7 @@ Traditional K-12 educational institutions across India and emerging markets face
 * **Conflict Resolution Table**: Provides a dedicated administrative interface (`OFFLINE_SYNC_CONFLICT`) to inspect, resolve, or override payment discrepancies safely.
 * **Offline Demo Resilience**: Features an intelligent network connection detector (`isDbUnreachable`) that automatically falls back to local demo data if the remote database server is unreachable or offline.
 
-### 5. 🤖 AI Financial Copilot & OCR Receipt Ingestion
+### 5. 🤖 AI Financial Copilot & Multimodal Vision OCR
 * **Gemini 1.5 Flash Vision OCR**: Enables school staff to upload scanned images of physical paper receipts, cheque deposit slips, or bank statements, automatically extracting student IDs, amounts, and dates into an automated staging form.
 * **Natural Language Copilot**: Allows administrators to ask complex natural language questions about school financial metrics (e.g., *"What is our total collection efficiency for Grade 10 transport fees this quarter?"*).
 * **Strict Read-Only Access Boundary**: The AI Copilot operates within a strictly read-only security sandbox — it can query and summarize financial data but can *never* execute financial mutations directly.
@@ -63,6 +64,15 @@ Traditional K-12 educational institutions across India and emerging markets face
 * **Unified Family Switcher**: Allows parents with multiple enrolled children to switch between student profiles seamlessly without logging out.
 * **Instant Sec 80C Tax Receipts**: Generates official, downloadable Section 80C Tax Certificates with auto-formatted PDFs for tuition fee tax deductions.
 * **Multi-Channel Payment Options**: Supports instant UPI QR code generation, online card/netbanking sandbox payments, direct WhatsApp payment link sharing, and tactile audio Soundbox confirmations upon payment completion.
+* **Multi-Language Support**: Supports 8 regional Indian languages (English, Hindi, Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada) for inclusive parent accessibility.
+
+### 7. 🎓 Student Lifecycle & Balance Disposition
+* **Lifecycle State Tracking**: Manages student statuses (`active`, `inactive`, `graduated`, `transferred`).
+* **Balance Disposition Guards**: Enforces strict financial settlement rules when changing student status — requiring explicit disposition of any remaining balance (e.g. refund, waiver, or write-off) to prevent stranded liabilities.
+
+### 8. 🛡 Authorization & Row-Level Security (RLS) Model
+* **Session Actor Bounding**: All administrative actions strictly derive the acting administrator ID from verified session tokens (`sessionAdminId`), preventing parameter tampering.
+* **Tenant Isolation**: Row-Level Security policies in PostgreSQL enforce school-level multi-tenancy and restrict parent data access strictly to linked student records.
 
 ---
 
@@ -154,11 +164,6 @@ pnpm test
 # Run type-checking across web application
 pnpm --filter web exec tsc --noEmit
 ```
-
-### Test Suite Breakdown
-* **`packages/rules`**: Tests financial calculation invariants, integer arithmetic, waiver rules, and duplicate reference detection.
-* **`apps/web/src/__tests__`**: Tests student directory filtering, waiver/penalty audit log creation, and bank reconciliation pipelines.
-* **`apps/web/tests/`**: Integration tests verifying session authorization guards, non-blocking notification dispatch, and tax certificate generation.
 
 ---
 
