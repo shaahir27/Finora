@@ -5,7 +5,7 @@ import { initiateUpiSandboxPayment as _initiateUpiSandboxPayment } from "@smart-
 import { calculateAmountPaid, calculateRemainingBalance, calculateWaivedAmount } from "@smart-school/rules";
 import { recordPaymentFromSandbox } from "./ledger";
 import { requireAdminForSchool, requireParentSession } from "@/lib/require-session";
-import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { isDemoMode, isDbUnreachable, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
 import {
   getDemoChildren,
   getDemoChildrenDues,
@@ -243,94 +243,102 @@ export async function getMyChildrenDues(studentId?: string) {
 export async function getParentInitData() {
   if (isDemoMode()) return getDemoParentInitData();
 
-  const { parentUserId } = await requireParentSession();
+  try {
+    const { parentUserId } = await requireParentSession();
 
-  const parentLink = await prisma.parentLink.findUnique({
-    where: { userId: parentUserId },
-    include: {
-      user: { select: { schoolId: true } },
-      guardianOf: {
-        include: {
-          student: {
-            include: {
-              feeAssignments: {
-                include: {
-                  feeType: true,
-                  transactions: { where: { reconciliationStatus: "posted" } },
-                  waivers: true,
+    const parentLink = await prisma.parentLink.findUnique({
+      where: { userId: parentUserId },
+      include: {
+        user: { select: { schoolId: true } },
+        guardianOf: {
+          include: {
+            student: {
+              include: {
+                feeAssignments: {
+                  include: {
+                    feeType: true,
+                    transactions: { where: { reconciliationStatus: "posted" } },
+                    waivers: true,
+                  },
                 },
               },
             },
           },
         },
       },
-    },
-  });
-
-  if (!parentLink) {
-    return {
-      parentLinkId: null,
-      schoolId: null,
-      children: [],
-      dues: [],
-    };
-  }
-
-  const schoolId = parentLink.user?.schoolId ?? null;
-  const children: any[] = [];
-  const dues: any[] = [];
-
-  for (const relation of parentLink.guardianOf) {
-    const student = relation.student;
-    if (student.status !== "active") continue;
-
-    children.push({
-      id: student.id,
-      name: student.name,
-      class: student.class,
-      admissionNumber: student.admissionNumber,
-      status: student.status,
     });
 
-    for (const assignment of student.feeAssignments) {
-      const amountPaid = calculateAmountPaid(assignment.transactions);
-      const waived = calculateWaivedAmount(assignment.waivers);
-      const remainingBalance = calculateRemainingBalance(assignment.amount.toNumber(), amountPaid, waived);
-
-      let paymentStatus = "unpaid";
-      if (remainingBalance <= 0) {
-        paymentStatus = "paid";
-      } else if (amountPaid > 0 || waived > 0) {
-        paymentStatus = "partially_paid";
-      }
-
-      const dueDate = new Date(assignment.dueDate);
-      if (remainingBalance > 0 && new Date() > dueDate) {
-        paymentStatus = "overdue";
-      }
-
-      dues.push({
-        id: assignment.id,
-        studentId: student.id,
-        studentName: student.name,
-        studentClass: student.class,
-        feeType: assignment.feeType.name,
-        gstRate: Number(assignment.feeType.gstRate),
-        amount: assignment.amount.toNumber(),
-        amountPaid,
-        remainingBalance,
-        paymentStatus,
-        dueDate: assignment.dueDate.toISOString().split("T")[0],
-      });
+    if (!parentLink) {
+      return {
+        parentLinkId: null,
+        schoolId: null,
+        children: [],
+        dues: [],
+      };
     }
-  }
 
-  return {
-    parentLinkId: parentLink.id,
-    schoolId,
-    children,
-    dues,
-  };
+    const schoolId = parentLink.user?.schoolId ?? null;
+    const children: any[] = [];
+    const dues: any[] = [];
+
+    for (const relation of parentLink.guardianOf) {
+      const student = relation.student;
+      if (student.status !== "active") continue;
+
+      children.push({
+        id: student.id,
+        name: student.name,
+        class: student.class,
+        admissionNumber: student.admissionNumber,
+        status: student.status,
+      });
+
+      for (const assignment of student.feeAssignments) {
+        const amountPaid = calculateAmountPaid(assignment.transactions);
+        const waived = calculateWaivedAmount(assignment.waivers);
+        const remainingBalance = calculateRemainingBalance(assignment.amount.toNumber(), amountPaid, waived);
+
+        let paymentStatus = "unpaid";
+        if (remainingBalance <= 0) {
+          paymentStatus = "paid";
+        } else if (amountPaid > 0 || waived > 0) {
+          paymentStatus = "partially_paid";
+        }
+
+        const dueDate = new Date(assignment.dueDate);
+        if (remainingBalance > 0 && new Date() > dueDate) {
+          paymentStatus = "overdue";
+        }
+
+        dues.push({
+          id: assignment.id,
+          studentId: student.id,
+          studentName: student.name,
+          studentClass: student.class,
+          feeType: assignment.feeType.name,
+          gstRate: Number(assignment.feeType.gstRate),
+          amount: assignment.amount.toNumber(),
+          amountPaid,
+          remainingBalance,
+          paymentStatus,
+          dueDate: assignment.dueDate.toISOString().split("T")[0],
+        });
+      }
+    }
+
+    return {
+      parentLinkId: parentLink.id,
+      schoolId,
+      children,
+      dues,
+    };
+  } catch (err: any) {
+    if (isDbUnreachable(err)) {
+      console.warn(`[getParentInitData] DB unreachable. Serving demo parent init data.`);
+      return getDemoParentInitData();
+    }
+    throw err;
+  }
 }
 
 

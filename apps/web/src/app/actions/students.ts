@@ -4,7 +4,7 @@ import { prisma, type Student, type StudentStatus, type BalanceDisposition } fro
 import { calculateRemainingBalance, calculateWaivedAmount, calculateAmountPaid } from "@smart-school/rules";
 import { applyWaiver } from "./ledger"; // We'll build this in Phase 5
 import { requireAdminForSchool } from "@/lib/require-session";
-import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { isDemoMode, isDbUnreachable, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
 import { getDemoStudents, getDemoStudentProfile } from "@/lib/demo-data";
 
 /**
@@ -251,71 +251,79 @@ export async function updateStudentStatus(
  */
 export async function getStudentProfile(schoolId: string, studentId: string) {
   if (isDemoMode()) return getDemoStudentProfile(studentId);
-  await requireAdminForSchool(schoolId);
+  try {
+    await requireAdminForSchool(schoolId);
 
-  const student = await prisma.student.findFirst({
-    where: { id: studentId, schoolId },
-    include: {
-      feeAssignments: {
-        include: {
-          feeType: true,
-          transactions: true,
-          waivers: { include: { approvedBy: true } },
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, schoolId },
+      include: {
+        feeAssignments: {
+          include: {
+            feeType: true,
+            transactions: true,
+            waivers: { include: { approvedBy: true } },
+          },
+        },
+        transactions: {
+          orderBy: { postedAt: "desc" },
+          include: {
+            feeAssignment: { include: { feeType: true } },
+            penalties: true,
+          },
+        },
+        defaulterScores: {
+          orderBy: { computedAt: "desc" },
         },
       },
-      transactions: {
-        orderBy: { postedAt: "desc" },
-        include: {
-          feeAssignment: { include: { feeType: true } },
-          penalties: true,
+    });
+
+    if (!student) throw new Error("Student not found");
+
+    // Serialize Decimal fields — Next.js cannot pass Prisma Decimal objects to Client Components.
+    return {
+      ...student,
+      feeAssignments: student.feeAssignments.map((a) => ({
+        ...a,
+        amount: Number(a.amount),
+        feeType: {
+          ...a.feeType,
+          gstRate: Number(a.feeType.gstRate),
         },
-      },
-      defaulterScores: {
-        orderBy: { computedAt: "desc" },
-      },
-    },
-  });
-
-  if (!student) throw new Error("Student not found");
-
-  // Serialize Decimal fields — Next.js cannot pass Prisma Decimal objects to Client Components.
-  return {
-    ...student,
-    feeAssignments: student.feeAssignments.map((a) => ({
-      ...a,
-      amount: Number(a.amount),
-      feeType: {
-        ...a.feeType,
-        gstRate: Number(a.feeType.gstRate),
-      },
-      transactions: a.transactions.map((t) => ({
+        transactions: a.transactions.map((t) => ({
+          ...t,
+          amount: Number(t.amount),
+          penalties: (t as any).penalties?.map((p: any) => ({ ...p, amount: Number(p.amount) })) ?? [],
+        })),
+        waivers: a.waivers.map((w) => ({
+          ...w,
+          amount: Number(w.amount),
+        })),
+      })),
+      transactions: student.transactions.map((t) => ({
         ...t,
         amount: Number(t.amount),
         penalties: (t as any).penalties?.map((p: any) => ({ ...p, amount: Number(p.amount) })) ?? [],
+        feeAssignment: t.feeAssignment
+          ? {
+              ...t.feeAssignment,
+              amount: Number((t.feeAssignment as any).amount),
+              feeType: t.feeAssignment.feeType
+                ? {
+                    ...(t.feeAssignment as any).feeType,
+                    gstRate: Number((t.feeAssignment as any).feeType?.gstRate),
+                  }
+                : null,
+            }
+          : null,
       })),
-      waivers: a.waivers.map((w) => ({
-        ...w,
-        amount: Number(w.amount),
-      })),
-    })),
-    transactions: student.transactions.map((t) => ({
-      ...t,
-      amount: Number(t.amount),
-      penalties: (t as any).penalties?.map((p: any) => ({ ...p, amount: Number(p.amount) })) ?? [],
-      feeAssignment: t.feeAssignment
-        ? {
-            ...t.feeAssignment,
-            amount: Number((t.feeAssignment as any).amount),
-            feeType: t.feeAssignment.feeType
-              ? {
-                  ...(t.feeAssignment as any).feeType,
-                  gstRate: Number((t.feeAssignment as any).feeType?.gstRate),
-                }
-              : null,
-          }
-        : null,
-    })),
-  };
+    };
+  } catch (err: any) {
+    if (isDbUnreachable(err)) {
+      console.warn(`[getStudentProfile] DB unreachable. Serving demo profile.`);
+      return getDemoStudentProfile(studentId);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -332,57 +340,65 @@ export async function getStudents(
 ) {
   if (isDemoMode()) return getDemoStudents();
 
-  await requireAdminForSchool(schoolId);
+  try {
+    await requireAdminForSchool(schoolId);
 
-  const limit = options?.limit || 50;
-  
-  const where: any = { schoolId };
-  if (options?.status) where.status = options.status;
-  if (options?.search) {
-    where.OR = [
-      { name: { contains: options.search, mode: "insensitive" } },
-      { admissionNumber: { contains: options.search, mode: "insensitive" } }
-    ];
-  }
+    const limit = options?.limit || 50;
+    
+    const where: any = { schoolId };
+    if (options?.status) where.status = options.status;
+    if (options?.search) {
+      where.OR = [
+        { name: { contains: options.search, mode: "insensitive" } },
+        { admissionNumber: { contains: options.search, mode: "insensitive" } }
+      ];
+    }
 
-  const students = await prisma.student.findMany({
-    where,
-    take: limit + 1,
-    ...(options?.cursor ? { cursor: { id: options.cursor } } : {}),
-    orderBy: { name: "asc" },
-    include: {
-      feeAssignments: {
-        include: {
-          transactions: { select: { amount: true, reconciliationStatus: true } },
-          waivers: { select: { amount: true } }
+    const students = await prisma.student.findMany({
+      where,
+      take: limit + 1,
+      ...(options?.cursor ? { cursor: { id: options.cursor } } : {}),
+      orderBy: { name: "asc" },
+      include: {
+        feeAssignments: {
+          include: {
+            transactions: { select: { amount: true, reconciliationStatus: true } },
+            waivers: { select: { amount: true } }
+          }
         }
       }
-    }
-  });
+    });
 
-  let nextCursor: string | undefined = undefined;
-  if (students.length > limit) {
-    const nextItem = students.pop();
-    nextCursor = nextItem?.id;
+    let nextCursor: string | undefined = undefined;
+    if (students.length > limit) {
+      const nextItem = students.pop();
+      nextCursor = nextItem?.id;
+    }
+
+    // Calculate balance for each student
+    const mapped = students.map(student => {
+      let totalBalance = 0;
+      for (const a of student.feeAssignments) {
+        const pd = calculateAmountPaid(a.transactions);
+        const wv = calculateWaivedAmount(a.waivers);
+        const bal = calculateRemainingBalance(a.amount.toNumber(), pd, wv);
+        totalBalance += bal;
+      }
+      
+      // Omit heavy relations for the list view
+      const { feeAssignments, ...rest } = student;
+      return { ...rest, totalBalance };
+    });
+
+    return {
+      students: mapped,
+      nextCursor
+    };
+  } catch (err: any) {
+    if (isDbUnreachable(err)) {
+      console.warn(`[getStudents] DB unreachable. Serving demo students.`);
+      return getDemoStudents();
+    }
+    throw err;
   }
-
-  // Calculate balance for each student
-  const mapped = students.map(student => {
-    let totalBalance = 0;
-    for (const a of student.feeAssignments) {
-      const pd = calculateAmountPaid(a.transactions);
-      const wv = calculateWaivedAmount(a.waivers);
-      const bal = calculateRemainingBalance(a.amount.toNumber(), pd, wv);
-      totalBalance += bal;
-    }
-    
-    // Omit heavy relations for the list view
-    const { feeAssignments, ...rest } = student;
-    return { ...rest, totalBalance };
-  });
-
-  return {
-    students: mapped,
-    nextCursor
-  };
 }

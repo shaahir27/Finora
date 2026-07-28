@@ -10,13 +10,14 @@ import {
 } from "@smart-school/rules";
 import { requireAdminForSchool } from "@/lib/require-session";
 import { draftReminderTextAction } from "./ai";
-import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { isDemoMode, isDbUnreachable, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
 import { getDemoDefaulters } from "@/lib/demo-data";
 
 export async function getDefaulters(schoolId: string) {
   if (isDemoMode()) return getDemoDefaulters();
 
-  await requireAdminForSchool(schoolId);
+  try {
+    await requireAdminForSchool(schoolId);
 
   // 1. Fetch all active students and their fee assignments (with transactions and waivers)
   const students = await prisma.student.findMany({
@@ -135,6 +136,13 @@ export async function getDefaulters(schoolId: string) {
   });
 
   return scoresToUpsert;
+  } catch (err: any) {
+    if (isDbUnreachable(err)) {
+      console.warn(`[getDefaulters] DB unreachable. Serving demo defaulters.`);
+      return getDemoDefaulters();
+    }
+    throw err;
+  }
 }
 
 export async function queueRemindersForStudent(schoolId: string, studentId: string) {

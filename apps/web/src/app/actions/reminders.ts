@@ -19,7 +19,7 @@ import {
   calculateRemainingBalance,
 } from "@smart-school/rules";
 import { requireAdminForSchool } from "@/lib/require-session";
-import { isDemoMode, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
+import { isDemoMode, isDbUnreachable, DEMO_WRITE_ERROR } from "@/lib/demo-mode";
 import { getDemoReminders } from "@/lib/demo-data";
 
 export interface ReminderQueueItem {
@@ -54,87 +54,95 @@ export async function getRemindersQueue(
 ): Promise<{ reminders: ReminderQueueItem[]; nextCursor: string | undefined }> {
   if (isDemoMode()) return getDemoReminders();
 
-  await requireAdminForSchool(schoolId);
+  try {
+    await requireAdminForSchool(schoolId);
 
-  const limit = options?.limit ?? 50;
+    const limit = options?.limit ?? 50;
 
-  const logs = await prisma.reminderLog.findMany({
-    where: {
-      feeAssignment: { schoolId },
-      ...(options?.status ? { status: options.status } : {}),
-    },
-    take: limit + 1,
-    ...(options?.cursor ? { cursor: { id: options.cursor } } : {}),
-    orderBy: [{ status: "asc" }, { tier: "desc" }, { createdAt: "asc" }],
-    include: {
-      feeAssignment: {
-        include: {
-          student: {
-            select: {
-              id: true,
-              name: true,
-              class: true,
-              guardianOf: {
-                include: {
-                  parentLink: {
-                    include: {
-                      user: { select: { phone: true } },
+    const logs = await prisma.reminderLog.findMany({
+      where: {
+        feeAssignment: { schoolId },
+        ...(options?.status ? { status: options.status } : {}),
+      },
+      take: limit + 1,
+      ...(options?.cursor ? { cursor: { id: options.cursor } } : {}),
+      orderBy: [{ status: "asc" }, { tier: "desc" }, { createdAt: "asc" }],
+      include: {
+        feeAssignment: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                name: true,
+                class: true,
+                guardianOf: {
+                  include: {
+                    parentLink: {
+                      include: {
+                        user: { select: { phone: true } },
+                      },
                     },
                   },
                 },
               },
             },
+            feeType: { select: { name: true } },
+            transactions: { select: { amount: true, reconciliationStatus: true } },
+            waivers: { select: { amount: true } },
           },
-          feeType: { select: { name: true } },
-          transactions: { select: { amount: true, reconciliationStatus: true } },
-          waivers: { select: { amount: true } },
         },
       },
-    },
-  });
+    });
 
-  let nextCursor: string | undefined;
-  if (logs.length > limit) {
-    const next = logs.pop();
-    nextCursor = next?.id;
+    let nextCursor: string | undefined;
+    if (logs.length > limit) {
+      const next = logs.pop();
+      nextCursor = next?.id;
+    }
+
+    const mapped: ReminderQueueItem[] = logs.map((log) => {
+      const fa = log.feeAssignment;
+      const paid = calculateAmountPaid(fa.transactions);
+      const waived = calculateWaivedAmount(fa.waivers);
+      const remainingBalance = calculateRemainingBalance(fa.amount.toNumber(), paid, waived);
+      const daysOverdue = Math.max(
+        0,
+        Math.floor((Date.now() - fa.dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      );
+      const isStale = remainingBalance <= 0;
+
+      const guardianPhone = fa.student.guardianOf.find((g) => g.parentLink?.user?.phone)?.parentLink?.user?.phone || null;
+
+      return {
+        id: log.id,
+        feeAssignmentId: fa.id,
+        studentName: fa.student.name,
+        studentId: fa.student.id,
+        studentClass: fa.student.class || "Grade 10",
+        guardianPhone,
+        feeTypeName: fa.feeType.name,
+        remainingBalance,
+        dueDate: fa.dueDate.toISOString().split("T")[0]!,
+        daysOverdue,
+        draftedText: log.draftedText,
+        tier: log.tier,
+        channel: log.channel,
+        status: log.status,
+        createdAt: log.createdAt.toISOString(),
+        sentAt: log.sentAt?.toISOString() ?? null,
+        dispatchError: log.dispatchError,
+        isStale,
+      };
+    });
+
+    return { reminders: mapped, nextCursor };
+  } catch (err: any) {
+    if (isDbUnreachable(err)) {
+      console.warn(`[getRemindersQueue] DB unreachable. Serving demo reminders.`);
+      return getDemoReminders();
+    }
+    throw err;
   }
-
-  const mapped: ReminderQueueItem[] = logs.map((log) => {
-    const fa = log.feeAssignment;
-    const paid = calculateAmountPaid(fa.transactions);
-    const waived = calculateWaivedAmount(fa.waivers);
-    const remainingBalance = calculateRemainingBalance(fa.amount.toNumber(), paid, waived);
-    const daysOverdue = Math.max(
-      0,
-      Math.floor((Date.now() - fa.dueDate.getTime()) / (1000 * 60 * 60 * 24))
-    );
-    const isStale = remainingBalance <= 0;
-
-    const guardianPhone = fa.student.guardianOf.find((g) => g.parentLink?.user?.phone)?.parentLink?.user?.phone || null;
-
-    return {
-      id: log.id,
-      feeAssignmentId: fa.id,
-      studentName: fa.student.name,
-      studentId: fa.student.id,
-      studentClass: fa.student.class || "Grade 10",
-      guardianPhone,
-      feeTypeName: fa.feeType.name,
-      remainingBalance,
-      dueDate: fa.dueDate.toISOString().split("T")[0]!,
-      daysOverdue,
-      draftedText: log.draftedText,
-      tier: log.tier,
-      channel: log.channel,
-      status: log.status,
-      createdAt: log.createdAt.toISOString(),
-      sentAt: log.sentAt?.toISOString() ?? null,
-      dispatchError: log.dispatchError,
-      isStale,
-    };
-  });
-
-  return { reminders: mapped, nextCursor };
 }
 
 import { Resend } from "resend";
