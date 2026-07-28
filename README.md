@@ -8,8 +8,8 @@
 
 Access the primary product specification and live presentation guides directly from the root directory:
 
-* 📋 **[Master Feature Inventory](file:///d:/Desktop/project/Smart_school/master_feature_inventory.md)** — Comprehensive catalog of all implemented features, functional requirements, and module scopes.
-* 🎭 **[Demo Presentation Guide](file:///d:/Desktop/project/Smart_school/demo_presentation_guide.md)** — Step-by-step walkthrough script for rehearsing and presenting live admin & parent workflows.
+* 📋 **Master Feature Inventory** — Comprehensive catalog of all implemented features, functional requirements, and module scopes.
+* 🎭 **Demo Presentation Guide** — Step-by-step walkthrough script for rehearsing and presenting live admin & parent workflows.
 
 ---
 
