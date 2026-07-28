@@ -315,7 +315,7 @@ export async function processOcrUploadAction(
   schoolId: string,
   imageUrl: string
 ): Promise<{ stagingId: string; extraction: Awaited<ReturnType<typeof processOcrUpload>> }> {
-  if (isDemoMode()) return { stagingId: "ocr-demo-1", extraction: { amount: 12500, date: "2026-07-25", refNumber: "CHQ-20260201", confidence: 0.94, fields: { amount: "12,500", date: "25-Jul-2026", refNumber: "CHQ-20260201" } } };
+  if (isDemoMode()) return { stagingId: "ocr-demo-1", extraction: { amount: 12500, date: "2026-07-25", refNumber: "CHQ-20260201", payerName: "Demo Parent", extractionNotes: "Demo cheque scan extracted", confidence: "high" } };
   const { adminId } = await requireAdminForSchool(schoolId);
   if (!rateLimit(`${adminId}:processOcrUpload`, { limit: 10, windowMs: 60 * 1000 })) {
     throw new Error("Rate limit exceeded. Please try again later.");
