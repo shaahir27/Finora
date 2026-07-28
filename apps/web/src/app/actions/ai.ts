@@ -498,7 +498,7 @@ export async function copilotQueryAction(
     parentLinkId?: string; // for parent role — scopes getMyChildrenDues
   }
 ) {
-  if (isDemoMode()) return { answer: "Hello! Finora AI Copilot is currently running in Demo Mode. I can help answer questions about your school's fee management, defaulter tracking, and bank reconciliation.", toolCalls: [] };
+  if (isDemoMode()) return { type: "answer" as const, text: "Hello! Finora AI Copilot is currently running in Demo Mode. I can help answer questions about your school's fee management, defaulter tracking, and bank reconciliation." };
   if (role === "admin") {
     await requireAdminForSchool(schoolId);
   } else {
